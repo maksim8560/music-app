@@ -212,12 +212,14 @@
             border-top: 1px solid #333;
             display: flex;
             gap: 15px;
+            align-items: center;
             background: rgba(20, 20, 30, 0.9);
+            position: relative;
         }
 
         .message-input {
             flex-grow: 1;
-            padding: 15px;
+            padding: 15px 50px 15px 20px;
             border-radius: 25px;
             border: 1px solid #333;
             background: rgba(255, 255, 255, 0.05);
@@ -230,6 +232,28 @@
         .message-input:focus {
             border-color: #4cc9f0;
             box-shadow: 0 0 10px rgba(76, 201, 240, 0.3);
+        }
+
+        .emoji-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #4cc9f0;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            right: 80px;
+        }
+
+        .emoji-btn:hover {
+            background: rgba(76, 201, 240, 0.2);
+            transform: scale(1.1);
         }
 
         .send-btn {
@@ -246,6 +270,77 @@
 
         .send-btn:hover {
             transform: scale(1.1);
+        }
+
+        /* Панель эмодзи */
+        .emoji-picker {
+            position: absolute;
+            bottom: 90px;
+            right: 20px;
+            width: 320px;
+            height: 350px;
+            background: rgba(25, 25, 35, 0.98);
+            border-radius: 15px;
+            border: 1px solid #333;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .emoji-categories {
+            display: flex;
+            padding: 10px;
+            border-bottom: 1px solid #333;
+            background: rgba(15, 15, 25, 0.9);
+        }
+
+        .emoji-category-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .emoji-category-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .emoji-category-btn.active {
+            background: rgba(76, 201, 240, 0.3);
+        }
+
+        .emoji-grid {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 5px;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .emoji-item {
+            font-size: 24px;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .emoji-item:hover {
+            background: rgba(76, 201, 240, 0.3);
+            transform: scale(1.2);
         }
 
         /* Формы авторизации */
@@ -438,6 +533,29 @@
             color: #aaa;
         }
 
+        /* Стили для эмодзи в сообщениях */
+        .message-emoji {
+            font-size: 20px;
+            margin: 0 2px;
+            vertical-align: middle;
+        }
+
+        .emoji-reaction {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin: 0 2px;
+            font-size: 14px;
+        }
+
+        .emoji-reaction-count {
+            margin-left: 4px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
         /* Адаптивность */
         @media (max-width: 768px) {
             .container {
@@ -478,6 +596,23 @@
             
             .video-container {
                 flex-direction: column;
+            }
+            
+            .emoji-picker {
+                width: 280px;
+                height: 300px;
+                right: 10px;
+                bottom: 80px;
+            }
+            
+            .emoji-grid {
+                grid-template-columns: repeat(7, 1fr);
+            }
+            
+            .emoji-item {
+                width: 30px;
+                height: 30px;
+                font-size: 20px;
             }
         }
     </style>
@@ -533,25 +668,29 @@
             
             <div class="message-input-container">
                 <input type="text" class="message-input" id="messageInput" placeholder="Введите сообщение..." disabled>
-                <button class="emoji-btn" id="emojiBtn" title="Эмодзи">
-                  <i class="fas fa-smile"></i>
+                <button class="emoji-btn" id="emojiBtn" title="Эмодзи" disabled>
+                    <i class="fas fa-smile"></i>
+                </button>
+                <button class="send-btn" id="sendMessageBtn" disabled>
+                    <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
+            
+            <!-- Панель эмодзи (скрыта по умолчанию) -->
+            <div class="emoji-picker" id="emojiPicker">
+                <div class="emoji-categories">
+                    <button class="emoji-category-btn active" data-category="smileys">😀</button>
+                    <button class="emoji-category-btn" data-category="hearts">❤️</button>
+                    <button class="emoji-category-btn" data-category="hands">👋</button>
+                    <button class="emoji-category-btn" data-category="animals">🐶</button>
+                    <button class="emoji-category-btn" data-category="food">🍕</button>
+                    <button class="emoji-category-btn" data-category="symbols">💯</button>
+                </div>
+                <div class="emoji-grid" id="emojiGrid">
+                    <!-- Эмодзи будут загружаться здесь динамически -->
+                </div>
+            </div>
         </div>
-
-     <div class="emoji-picker" id="emojiPicker" style="display: none;">
-      <div class="emoji-categories">
-        <button class="emoji-category-btn active" data-category="smileys">😀</button>
-        <button class="emoji-category-btn" data-category="hearts">❤️</button>
-        <button class="emoji-category-btn" data-category="hands">👋</button>
-        <button class="emoji-category-btn" data-category="animals">🐶</button>
-        <button class="emoji-category-btn" data-category="food">🍕</button>
-        <button class="emoji-category-btn" data-category="symbols">💯</button>
-      </div>
-      <div class="emoji-grid" id="emojiGrid">
-        <!-- Эмодзи будут загружаться здесь динамически -->
-      </div>
-    </div>
         
         <!-- Окно звонка (скрыто по умолчанию) -->
         <div class="call-container" id="callContainer" style="display: none;">
@@ -660,12 +799,24 @@
         let callStartTime = null;
         let callTimerInterval = null;
         let verificationCode = null;
+        let emojiPickerVisible = false;
+        let emojiCategories = {};
         
         // Эмуляция базы данных в LocalStorage
         const DB = {
             users: JSON.parse(localStorage.getItem('messenger_users')) || [],
             messages: JSON.parse(localStorage.getItem('messenger_messages')) || {},
             contacts: JSON.parse(localStorage.getItem('messenger_contacts')) || {}
+        };
+        
+        // Эмодзи для панели
+        const EMOJI_DATA = {
+            smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠'],
+            hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟'],
+            hands: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏'],
+            animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🕷️', '🦂', '🐢', '🐍', '🦎', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐫', '🦒', '🦘', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🐈', '🐓', '🦃', '🦚', '🦜', '🦢', '🕊️', '🐇', '🦝', '🦨', '🦡', '🦫', '🦦', '🦥', '🐁', '🐀', '🐿️', '🦔'],
+            food: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🌭', '🍔', '🍟', '🍕', '🫓', '🥪', '🥙', '🧆', '🌮', '🌯', '🫔', '🥗', '🥘', '🫕', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯'],
+            symbols: ['❤️‍🔥', '❤️‍🩹', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴', '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️', '🆚', '💮', '🉐', '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲', '🅰️', '🅱️', '🆎', '🆑', '🅾️', '🆘', '❌', '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞', '📵', '🚭', '❗', '❕', '❓', '❔', '‼️', '⁉️', '🔅', '🔆', '〽️', '⚠️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✅', '🈯', '💹', '❇️', '✳️', '❎', '🌐', '💠', 'Ⓜ️', '🌀', '💤', '🏧', '🚾', '♿', '🅿️', '🈳', '🈂️', '🛂', '🛃', '🛄', '🛅', '🚹', '🚺', '🚼', '⚧️', '🚻', '🚮', '🎦', '📶', '🈁', '🔣', 'ℹ️', '🔤', '🔡', '🔠', '🆖', '🆗', '🆙', '🆒', '🆕', '🆓']
         };
         
         // ======================== ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ ========================
@@ -711,7 +862,7 @@
             
             // Генерация и "отправка" кода (в реальном приложении здесь был бы запрос на сервер)
             verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            console.log(`Код подтверждения для ${email}: ${verificationCode}`); // Для отладки
+            console.log(`Код подтверждения для ${email}: ${verificationCode}`);
             alert(`В реальном приложении код был бы отправлен на ${email}. Для демо-версии код: ${verificationCode}`);
         }
         
@@ -737,7 +888,6 @@
                 
                 // Добавляем демо-контакты для нового пользователя
                 if (DB.users.length > 1) {
-                    // Берем первых двух пользователей как демо-контакты
                     const demoContacts = DB.users
                         .filter(u => u.id !== currentUser.id)
                         .slice(0, 2);
@@ -746,7 +896,7 @@
                         DB.contacts[currentUser.id].push({
                             id: contact.id,
                             username: contact.username,
-                            lastSeen: Date.now() - Math.floor(Math.random() * 3600000) // Случайное время последнего посещения
+                            lastSeen: Date.now() - Math.floor(Math.random() * 3600000)
                         });
                     });
                 }
@@ -770,23 +920,23 @@
             // Инициализируем WebSocket соединение (эмуляция)
             initWebSocket();
             
+            // Загружаем эмодзи
+            loadEmojis();
+            
             return true;
         }
         
         function register(username, email, password) {
-            // Проверка на существующего пользователя
             if (getUserByUsername(username)) {
                 document.getElementById('registerError').textContent = 'Пользователь с таким логином уже существует';
                 return false;
             }
             
-            // Проверка пароля
             if (password.length < 6) {
                 document.getElementById('registerError').textContent = 'Пароль должен содержать не менее 6 символов';
                 return false;
             }
             
-            // Сохраняем данные для подтверждения
             const userData = {
                 username,
                 email,
@@ -796,10 +946,7 @@
                 registeredAt: Date.now()
             };
             
-            // Показываем форму подтверждения
             showVerifyForm(email);
-            
-            // Сохраняем временные данные пользователя
             window.tempUserData = userData;
             
             return true;
@@ -811,17 +958,69 @@
                 return false;
             }
             
-            // Регистрируем пользователя
             DB.users.push(window.tempUserData);
             saveToLocalStorage();
             
-            // Автоматически входим
             login(window.tempUserData.username, window.tempUserData.password);
-            
-            // Очищаем временные данные
             window.tempUserData = null;
             
             return true;
+        }
+        
+        // ======================== ФУНКЦИИ ДЛЯ ЭМОДЗИ ========================
+        function loadEmojis() {
+            emojiCategories = EMOJI_DATA;
+            showEmojiCategory('smileys');
+        }
+        
+        function showEmojiCategory(category) {
+            const emojiGrid = document.getElementById('emojiGrid');
+            emojiGrid.innerHTML = '';
+            
+            if (!emojiCategories[category]) return;
+            
+            emojiCategories[category].forEach(emoji => {
+                const emojiElement = document.createElement('div');
+                emojiElement.className = 'emoji-item';
+                emojiElement.textContent = emoji;
+                emojiElement.title = emoji;
+                
+                emojiElement.addEventListener('click', () => {
+                    insertEmoji(emoji);
+                });
+                
+                emojiGrid.appendChild(emojiElement);
+            });
+            
+            // Обновляем активную категорию
+            document.querySelectorAll('.emoji-category-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.emoji-category-btn[data-category="${category}"]`).classList.add('active');
+        }
+        
+        function insertEmoji(emoji) {
+            const input = document.getElementById('messageInput');
+            const cursorPos = input.selectionStart;
+            const textBefore = input.value.substring(0, cursorPos);
+            const textAfter = input.value.substring(cursorPos);
+            
+            input.value = textBefore + emoji + textAfter;
+            input.focus();
+            input.setSelectionRange(cursorPos + emoji.length, cursorPos + emoji.length);
+            
+            // Скрываем панель эмодзи после выбора
+            toggleEmojiPicker(false);
+        }
+        
+        function toggleEmojiPicker(show) {
+            const picker = document.getElementById('emojiPicker');
+            if (show === undefined) {
+                show = !emojiPickerVisible;
+            }
+            
+            emojiPickerVisible = show;
+            picker.style.display = show ? 'flex' : 'none';
         }
         
         // ======================== ОСНОВНОЙ ИНТЕРФЕЙС ========================
@@ -847,7 +1046,6 @@
                 contactElement.className = 'contact';
                 contactElement.dataset.userId = contact.id;
                 
-                // Получаем последнее сообщение с этим контактом
                 const contactMessages = messages[contact.id] || [];
                 const lastMessage = contactMessages.length > 0 ? contactMessages[contactMessages.length - 1] : null;
                 
@@ -858,7 +1056,7 @@
                     <div class="contact-info">
                         <h4>${contact.username}</h4>
                         <div class="last-message">
-                            ${lastMessage ? (lastMessage.senderId === currentUser.id ? 'Вы: ' : '') + lastMessage.text : 'Нет сообщений'}
+                            ${lastMessage ? (lastMessage.senderId === currentUser.id ? 'Вы: ' : '') + formatMessagePreview(lastMessage.text) : 'Нет сообщений'}
                         </div>
                     </div>
                 `;
@@ -868,31 +1066,34 @@
             });
         }
         
+        function formatMessagePreview(text) {
+            // Обрезаем длинные сообщения и обрабатываем эмодзи
+            if (text.length > 30) {
+                return text.substring(0, 27) + '...';
+            }
+            return text;
+        }
+        
         function selectContact(contactId) {
-            // Снимаем выделение со всех контактов
             document.querySelectorAll('.contact').forEach(c => c.classList.remove('active'));
             
-            // Выделяем выбранный контакт
             const contactElement = document.querySelector(`.contact[data-user-id="${contactId}"]`);
             if (contactElement) {
                 contactElement.classList.add('active');
             }
             
-            // Находим контакт в списке
             currentContact = contacts.find(c => c.id === contactId);
             if (!currentContact) return;
             
-            // Обновляем заголовок чата
             document.getElementById('chatContactName').textContent = currentContact.username;
             document.getElementById('chatAvatar').textContent = currentContact.username.charAt(0).toUpperCase();
             document.getElementById('chatAvatar').style.background = getColorForName(currentContact.username);
             
-            // Активируем кнопки
             document.getElementById('audioCallBtn').disabled = false;
             document.getElementById('messageInput').disabled = false;
             document.getElementById('sendMessageBtn').disabled = false;
+            document.getElementById('emojiBtn').disabled = false;
             
-            // Загружаем сообщения
             loadMessages(contactId);
         }
         
@@ -900,7 +1101,6 @@
             const messagesContainer = document.getElementById('messagesContainer');
             messagesContainer.innerHTML = '';
             
-            // Получаем сообщения с этим контактом
             const contactMessages = messages[contactId] || [];
             
             if (contactMessages.length === 0) {
@@ -913,23 +1113,32 @@
                 return;
             }
             
-            // Отображаем все сообщения
             contactMessages.forEach(msg => {
                 const messageElement = document.createElement('div');
                 messageElement.className = `message ${msg.senderId === currentUser.id ? 'outgoing' : 'incoming'}`;
                 
                 const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 
+                // Обрабатываем эмодзи в тексте сообщения
+                const messageText = parseEmojisInText(msg.text);
+                
                 messageElement.innerHTML = `
-                    <div>${msg.text}</div>
+                    <div>${messageText}</div>
                     <div class="message-time">${time}</div>
                 `;
                 
                 messagesContainer.appendChild(messageElement);
             });
             
-            // Прокручиваем вниз
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function parseEmojisInText(text) {
+            // Простая замена эмодзи на span с увеличенным размером
+            // В реальном приложении можно использовать более сложную логику
+            return text.replace(/[\u{1F300}-\u{1F9FF}]/gu, match => 
+                `<span class="message-emoji">${match}</span>`
+            );
         }
         
         function sendMessage() {
@@ -938,7 +1147,6 @@
             
             if (!text || !currentContact) return;
             
-            // Создаем объект сообщения
             const message = {
                 id: 'msg_' + Date.now(),
                 text: text,
@@ -948,13 +1156,11 @@
                 read: false
             };
             
-            // Сохраняем сообщение локально
             if (!messages[currentContact.id]) {
                 messages[currentContact.id] = [];
             }
             messages[currentContact.id].push(message);
             
-            // Сохраняем в "базу данных"
             if (!DB.messages[currentUser.id]) {
                 DB.messages[currentUser.id] = {};
             }
@@ -963,7 +1169,6 @@
             }
             DB.messages[currentUser.id][currentContact.id].push(message);
             
-            // Также сохраняем сообщение для получателя (в реальном приложении это делал бы сервер)
             if (!DB.messages[currentContact.id]) {
                 DB.messages[currentContact.id] = {};
             }
@@ -974,16 +1179,11 @@
             
             saveToLocalStorage();
             
-            // Обновляем интерфейс
             loadMessages(currentContact.id);
-            
-            // Очищаем поле ввода
             input.value = '';
             
-            // Обновляем последнее сообщение в списке контактов
             updateLastMessageInContactList(currentContact.id, text);
             
-            // В реальном приложении здесь было бы отправлено сообщение через WebSocket
             if (socket) {
                 socket.send(JSON.stringify({
                     type: 'message',
@@ -995,7 +1195,7 @@
         function updateLastMessageInContactList(contactId, lastMessageText) {
             const contactElement = document.querySelector(`.contact[data-user-id="${contactId}"] .last-message`);
             if (contactElement) {
-                contactElement.textContent = 'Вы: ' + lastMessageText;
+                contactElement.textContent = 'Вы: ' + formatMessagePreview(lastMessageText);
             }
         }
         
@@ -1009,12 +1209,9 @@
             isCaller = true;
             showCallScreen(`Звонок ${currentContact.username}...`);
             
-            // Инициализируем звонок
             initCall();
             
-            // В реальном приложении здесь был бы сигналинг через WebSocket
             setTimeout(() => {
-                // Эмуляция ответа на звонок через 3 секунды
                 if (isCaller) {
                     simulateIncomingAnswer();
                 }
@@ -1025,9 +1222,8 @@
             document.getElementById('callTitle').textContent = title;
             document.getElementById('callerName').textContent = currentContact ? currentContact.username : 'Собеседник';
             document.getElementById('callContainer').style.display = 'flex';
-            document.getElementById('videoContainer').style.display = 'none'; // Скрываем видео для аудиозвонка
+            document.getElementById('videoContainer').style.display = 'none';
             
-            // Скрываем кнопку принятия звонка, если мы инициатор
             if (isCaller) {
                 document.getElementById('acceptCallBtn').style.display = 'none';
             } else {
@@ -1036,15 +1232,10 @@
         }
         
         function initCall() {
-            // Запрос доступа к микрофону
             navigator.mediaDevices.getUserMedia({ audio: true, video: false })
                 .then(stream => {
                     localStream = stream;
-                    
-                    // В реальном приложении здесь создавалось бы WebRTC соединение
                     console.log('Микрофон доступен, начинаем звонок...');
-                    
-                    // Запускаем таймер звонка
                     startCallTimer();
                 })
                 .catch(err => {
@@ -1055,25 +1246,18 @@
         }
         
         function acceptCall() {
-            // Принимаем звонок
             console.log('Звонок принят');
             
-            // Показываем видео (хотя у нас только аудио)
             document.getElementById('videoContainer').style.display = 'flex';
             
-            // Запрашиваем доступ к микрофону
             navigator.mediaDevices.getUserMedia({ audio: true, video: false })
                 .then(stream => {
                     localStream = stream;
-                    
-                    // В реальном приложении здесь отправлялся бы answer через WebSocket
                     console.log('Готов к разговору');
                     
-                    // Обновляем интерфейс
                     document.getElementById('callTitle').textContent = 'Идет разговор';
                     document.getElementById('acceptCallBtn').style.display = 'none';
                     
-                    // Запускаем таймер
                     startCallTimer();
                 })
                 .catch(err => {
@@ -1083,7 +1267,6 @@
         }
         
         function endCall() {
-            // Останавливаем медиапотоки
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
@@ -1094,19 +1277,14 @@
                 remoteStream = null;
             }
             
-            // Сбрасываем состояние
             isCaller = false;
             
-            // Останавливаем таймер
             if (callTimerInterval) {
                 clearInterval(callTimerInterval);
                 callTimerInterval = null;
             }
             
-            // Скрываем окно звонка
             document.getElementById('callContainer').style.display = 'none';
-            
-            // Сбрасываем кнопки звонка
             document.getElementById('endCallBtn').style.display = 'none';
             document.getElementById('audioCallBtn').style.display = 'inline-flex';
         }
@@ -1129,7 +1307,6 @@
         }
         
         function simulateIncomingAnswer() {
-            // Эмуляция принятия звонка собеседником
             if (isCaller) {
                 document.getElementById('callTitle').textContent = 'Идет разговор';
                 document.getElementById('videoContainer').style.display = 'flex';
@@ -1159,13 +1336,7 @@
         }
         
         function initWebSocket() {
-            // Эмуляция WebSocket соединения
             console.log('WebSocket соединение инициализировано (эмуляция)');
-            
-            // В реальном приложении здесь был бы код для установки WebSocket соединения
-            // socket = new WebSocket('ws://your-server.com');
-            // socket.onmessage = handleWebSocketMessage;
-            // и т.д.
         }
         
         // ======================== ИНИЦИАЛИЗАЦИЯ СОБЫТИЙ ========================
@@ -1248,6 +1419,30 @@
                 if (e.key === 'Enter') sendMessage();
             });
             
+            // События для эмодзи
+            document.getElementById('emojiBtn').addEventListener('click', () => {
+                toggleEmojiPicker();
+            });
+            
+            // События для категорий эмодзи
+            document.querySelectorAll('.emoji-category-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const category = btn.dataset.category;
+                    showEmojiCategory(category);
+                });
+            });
+            
+            // Закрытие панели эмодзи при клике вне её
+            document.addEventListener('click', (e) => {
+                const picker = document.getElementById('emojiPicker');
+                const emojiBtn = document.getElementById('emojiBtn');
+                
+                if (emojiPickerVisible && picker && !picker.contains(e.target) && 
+                    e.target !== emojiBtn && !emojiBtn.contains(e.target)) {
+                    toggleEmojiPicker(false);
+                }
+            });
+            
             // События для звонков
             document.getElementById('audioCallBtn').addEventListener('click', startCall);
             document.getElementById('endCallBtn').addEventListener('click', endCall);
@@ -1256,7 +1451,6 @@
             
             // Инициализация демо-данных при первом запуске
             if (DB.users.length === 0) {
-                // Создаем демо-пользователей
                 const demoUsers = [
                     { username: 'Алексей', email: 'alex@demo.com', password: '123456' },
                     { username: 'Мария', email: 'maria@demo.com', password: '123456' },
@@ -1281,7 +1475,6 @@
             if (lastUser) {
                 const user = JSON.parse(lastUser);
                 if (getUserByUsername(user.username)) {
-                    // Автоматический вход
                     login(user.username, user.password);
                 }
             }
