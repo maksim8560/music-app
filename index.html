@@ -533,11 +533,25 @@
             
             <div class="message-input-container">
                 <input type="text" class="message-input" id="messageInput" placeholder="Введите сообщение..." disabled>
-                <button class="send-btn" id="sendMessageBtn" disabled>
-                    <i class="fas fa-paper-plane"></i>
+                <button class="emoji-btn" id="emojiBtn" title="Эмодзи">
+                  <i class="fas fa-smile"></i>
                 </button>
             </div>
         </div>
+
+     <div class="emoji-picker" id="emojiPicker" style="display: none;">
+      <div class="emoji-categories">
+        <button class="emoji-category-btn active" data-category="smileys">😀</button>
+        <button class="emoji-category-btn" data-category="hearts">❤️</button>
+        <button class="emoji-category-btn" data-category="hands">👋</button>
+        <button class="emoji-category-btn" data-category="animals">🐶</button>
+        <button class="emoji-category-btn" data-category="food">🍕</button>
+        <button class="emoji-category-btn" data-category="symbols">💯</button>
+      </div>
+      <div class="emoji-grid" id="emojiGrid">
+        <!-- Эмодзи будут загружаться здесь динамически -->
+      </div>
+    </div>
         
         <!-- Окно звонка (скрыто по умолчанию) -->
         <div class="call-container" id="callContainer" style="display: none;">
