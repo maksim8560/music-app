@@ -1,7 +1,0 @@
-echo "# web-messenger" >> README.md
-git init
-git add README.md
-git commit -m "first commit"
-git branch -M Servers
-git remote add origin https://github.com/maksim8560/web-messenger.git
-git push -u origin Servers
