@@ -2,69 +2,167 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Music App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apple Music Backend</title>
 
 <style>
 body {
     margin: 0;
-    font-family: -apple-system;
-    background: #000;
-    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    background: #000;
+    color: white;
 }
 
-/* UI */
+/* BACKGROUND */
+.bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    filter: blur(40px) brightness(0.5);
+    transform: scale(1.2);
+}
+
+/* PLAYER */
 .player {
-    width: 320px;
+    position: relative;
+    width: 340px;
     padding: 20px;
+    border-radius: 30px;
     background: rgba(255,255,255,0.08);
-    backdrop-filter: blur(20px);
-    border-radius: 25px;
+    backdrop-filter: blur(30px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
 }
 
+/* TITLE */
+.title {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.subtitle {
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 10px;
+}
+
+/* BUTTONS */
 button {
     padding: 10px;
     margin: 5px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+}
+
+/* LIST */
+.list {
+    max-height: 120px;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+.item {
+    padding: 8px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.item:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+/* ADMIN PANEL */
+.panel {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 15px;
 }
 </style>
 </head>
 
 <body>
 
+<div class="bg" id="bg"></div>
+
 <div class="player">
-    <h3 id="title">Loading...</h3>
+    <div class="title" id="title">Loading...</div>
+    <div class="subtitle" id="status">Disconnected</div>
 
-    <button onclick="login()">Login Admin</button>
-    <button onclick="add()">Add Station</button>
+    <button onclick="login()">Admin Login</button>
 
-    <div id="list"></div>
+    <div class="panel">
+        <input id="name" placeholder="Name">
+        <input id="stream" placeholder="Stream URL">
+        <button onclick="addStation()">Add</button>
+    </div>
 
-    <p id="footer"></p>
+    <div class="list" id="list"></div>
 </div>
 
+<audio id="audio"></audio>
+
 <script>
+const API = "http://localhost:3000";
+
 let token = "";
 let stations = [];
+let current = 0;
 
+const audio = document.getElementById("audio");
+
+/* LOAD */
 async function loadStations() {
-    const res = await fetch("http://localhost:3000/stations");
+    const res = await fetch(API + "/stations");
     stations = await res.json();
 
+    render();
+}
+
+/* RENDER */
+function render() {
     const list = document.getElementById("list");
     list.innerHTML = "";
 
-    stations.forEach(s => {
+    stations.forEach((s, i) => {
         const div = document.createElement("div");
-        div.innerHTML = s.name;
+        div.className = "item";
+        div.innerText = s.name;
+
+        div.onclick = () => {
+            play(i);
+        };
+
         list.appendChild(div);
     });
+
+    if (stations.length > 0) play(0);
 }
 
+/* PLAY */
+function play(i) {
+    current = i;
+
+    document.getElementById("title").innerText = stations[i].name;
+    audio.src = stations[i].stream;
+    audio.play();
+
+    updateBg();
+}
+
+/* BACKGROUND */
+function updateBg() {
+    document.getElementById("bg").style.backgroundImage =
+        `url(https://picsum.photos/800/600?random=${Date.now()})`;
+}
+
+/* LOGIN */
 async function login() {
-    const res = await fetch("http://localhost:3000/login", {
+    const res = await fetch(API + "/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,16 +172,19 @@ async function login() {
     });
 
     const data = await res.json();
-    token = data.token;
 
-    alert("Logged in!");
+    if (data.token) {
+        token = data.token;
+        document.getElementById("status").innerText = "Admin logged in";
+    }
 }
 
-async function add() {
-    const name = prompt("Name");
-    const stream = prompt("Stream URL");
+/* ADD STATION */
+async function addStation() {
+    const name = document.getElementById("name").value;
+    const stream = document.getElementById("stream").value;
 
-    await fetch("http://localhost:3000/stations", {
+    await fetch(API + "/stations", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -95,6 +196,7 @@ async function add() {
     loadStations();
 }
 
+/* INIT */
 loadStations();
 </script>
 
