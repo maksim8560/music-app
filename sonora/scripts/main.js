@@ -13,8 +13,8 @@ import { renderQueue } from './ui/queue.js';
 import { initTransport, syncTrack, syncState, syncVolume, syncLike } from './ui/transport.js';
 import { initPalette, open as openPalette, paletteShortcut } from './ui/palette.js';
 import { initSettings, applyTheme, openSettingsSheet, openQueueSheet } from './ui/settings.js';
-import { initAdmin, openAdmin } from './ui/admin.js';
-import { initSync } from './data/sync.js';
+import { initAdmin, openAdmin, isAdminOpen } from './ui/admin.js';
+import { initSync, startWatch } from './data/sync.js';
 import { admin } from './data/admin.js';
 import { initShortcuts } from './ui/shortcuts.js';
 import { createVisualizers } from './ui/visualizer.js';
@@ -380,6 +380,23 @@ function boot() {
      first paint so a slow or unreachable GitHub never delays the page opening;
      when it lands, reconcile() puts the shelf in place. */
   initSync();
+  /* Someone else can save while this tab is open. Watching the file is what
+     keeps a phone that has been lying on the table from showing a shelf that
+     was replaced ten minutes ago - the check is a conditional request, so a
+     minute of polling costs nothing against GitHub's hourly limit. */
+  startWatch({
+    busy: isAdminOpen,
+    onChange: ({ added, total }) => {
+      renderSidePlaylists();
+      if (added > 0) {
+        toast(`Каталог обновился: ${plural(added, 'новый трек', 'новых трека', 'новых треков')}`, 'ok', 4000);
+      } else if (added < 0) {
+        toast(`Каталог обновился: убрано ${plural(-added, 'трек', 'трека', 'треков')}`, 'info', 4000);
+      } else {
+        toast(`Каталог обновлён с другого устройства — ${plural(total, 'трек', 'трека', 'треков')}`, 'info', 4000);
+      }
+    },
+  });
   syncTrack();
   syncState();
   updateCounters();

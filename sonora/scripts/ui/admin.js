@@ -799,7 +799,7 @@ function buildSync() {
   return el('div', { class: 'adm-stack' }, [
     el('div', { class: 'adm-add' }, [
       el('h3', { text: 'Где хранится каталог' }),
-      el('p', { class: 'adm-note', text: 'Каталог лежит файлом в репозитории и читается оттуда при каждой загрузке страницы — на любом устройстве, без входа и без настройки. Настройки ниже нужны только для записи: чтобы панель могла сохранять.' }),
+      el('p', { class: 'adm-note', text: 'Каталог лежит файлом в репозитории и читается оттуда — на любом устройстве, без входа и без настройки. Открытая страница сама спрашивает, не изменился ли файл, и обновляет полку без перезагрузки: обычно в течение минуты, а если вкладку вернули к себе — сразу. Настройки ниже нужны только для записи: чтобы панель могла сохранять.' }),
       el('div', { class: 'adm-grid adm-grid--one' }, [
         field('Репозиторий', input(draft.repo, (v) => set('repo', v), { placeholder: 'maksim8560/music-app' })),
         field('Ветка', input(draft.branch, (v) => set('branch', v), { placeholder: 'Main' })),
@@ -984,6 +984,14 @@ function switchTab(name) {
   if (name === 'playlists') renderPlaylists();
   if (name === 'sync') renderSync();
   if (name === 'password') renderPassword();
+}
+
+/**
+ * The watcher asks before it redraws anything: a catalogue that arrives while
+ * the admin has half-made edits would move the fields out from under them.
+ */
+export function isAdminOpen() {
+  return open;
 }
 
 export function close() {

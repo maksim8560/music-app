@@ -25,6 +25,8 @@ let timer = 0;
 let inFlight = null;
 /** this browser holds tracks the shared file does not — never let a file win silently */
 let pendingPublish = false;
+/** ETag of the last read, so the watcher's next question costs nothing */
+let watchEtag = '';
 
 const emit = () => {
   for (const fn of listeners) {
@@ -60,8 +62,9 @@ export async function initSync() {
   }
   set('loading', 'Читаю каталог…');
   try {
-    const { doc, sha: fileSha } = await fetchRemote();
+    const { doc, sha: fileSha, etag } = await fetchRemote();
     sha = fileSha;
+    watchEtag = etag;
     if (!doc) {
       pendingPublish = admin.library().length > 0;
       set(pendingPublish ? 'diverged' : 'readonly',
@@ -101,6 +104,90 @@ export async function initSync() {
 /** True when this browser holds tracks the shared file does not. */
 export function hasLocalOnly() {
   return pendingPublish;
+}
+
+/* ==========================================================================
+   Watching the file
+   --------------------------------------------------------------------------
+   Saving in the panel writes a file in the repository. Everyone else finds out
+   the next time they load the page - which is the whole problem: a phone left
+   open on the table keeps showing yesterday's shelf.
+
+   So the page asks the file whether it changed, on a timer and again whenever
+   the tab comes back to the front. The question is a conditional request
+   carrying the ETag from the last read, and GitHub answers 304 without spending
+   any of the anonymous caller's hourly requests. That is what makes watching
+   affordable: a minute of polling costs nothing, while a full read every
+   minute would use the whole hourly budget in an hour.
+
+   When the answer is "yes" the file is merged exactly the way startup merges
+   it, so a device never loses its own unsaved tracks to somebody else's edit.
+   ========================================================================== */
+
+/** with a usable ETag a 304 is free, so we can be quick about it */
+const WATCH_FAST = 60_000;
+/** without one every check is a full read, and the budget is 60 an hour */
+const WATCH_SLOW = 5 * 60_000;
+
+let watchTimer = 0;
+let watchBusy = false;
+let watching = false;
+let onRemoteChange = null;
+let isPanelBusy = null;
+
+async function poll() {
+  if (watchBusy || inFlight) return;
+  /* never redraw the panel under the admin's hands */
+  if (isPanelBusy && isPanelBusy()) return;
+  watchBusy = true;
+  try {
+    const res = await fetchRemote({ etag: watchEtag });
+    if (res.notModified) return;
+    watchEtag = res.etag;
+    if (!res.doc || res.sha === sha) return;
+
+    sha = res.sha;
+    const before = admin.library().length;
+    admin.load(res.doc);
+    player.reconcile();
+    const after = admin.library().length;
+    /* the merge keeps whatever this device had, so the "only here" warning is
+       not this event's business - it belongs to the next full load */
+    if (onRemoteChange) onRemoteChange({ added: after - before, total: after });
+  } catch (err) {
+    /* a failed check is not news: say it once in the console and try again
+       on the next tick rather than interrupting whoever is listening */
+    console.warn('[sync] не удалось проверить файл каталога', err);
+  } finally {
+    watchBusy = false;
+  }
+}
+
+/**
+ * Start watching. `isBusy` should tell whether the admin panel is open with
+ * unsaved edits; `onChange` hears about a catalogue that changed elsewhere.
+ */
+export function startWatch({ busy, onChange } = {}) {
+  if (watching) return;
+  watching = true;
+  isPanelBusy = busy || null;
+  onRemoteChange = onChange || null;
+
+  const tick = () => {
+    clearTimeout(watchTimer);
+    watchTimer = setTimeout(async () => {
+      await poll();
+      tick();
+    }, watchEtag ? WATCH_FAST : WATCH_SLOW);
+  };
+  tick();
+
+  /* coming back to the tab is the moment staleness is visible, so ask at once
+     instead of making someone wait out the rest of the interval */
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') poll();
+  });
+  window.addEventListener('online', () => poll());
 }
 
 /** Called after anything the admin commits. One write per burst of edits. */

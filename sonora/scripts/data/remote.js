@@ -126,24 +126,36 @@ function checkToken(cfg) {
 }
 
 /**
- * Read the document. Returns { doc, sha } — sha is what a later write needs.
+ * Read the document. Returns { doc, sha, etag, notModified } — sha is what a
+ * later write needs, etag is what makes the next read cheap.
  * A missing file is not an error: it just means nothing has been saved yet.
+ *
+ * Pass the etag from the previous read and GitHub answers 304 when nothing
+ * changed. That matters more than it looks: a 304 does not count against the
+ * rate limit, so a page may watch the file as often as it likes, while a full
+ * read costs one of the 60 requests an hour GitHub allows an anonymous caller.
  */
-export async function fetchRemote() {
+export async function fetchRemote({ etag = '' } = {}) {
   const cfg = remoteConfig();
   const { owner, name } = parseRepo(cfg.repo);
   if (!cfg.branch.trim()) throw new Error('Укажите ветку.');
   if (!cfg.path.trim()) throw new Error('Укажите путь к файлу.');
   const url = `${API}/repos/${owner}/${name}/contents/${cfg.path}?ref=${encodeURIComponent(cfg.branch)}`;
-  const res = await request(url, { headers: headers(cfg.token), cache: 'no-store' }, 'Чтение каталога');
-  if (res.status === 404) return { doc: null, sha: null };
+  const h = headers(cfg.token);
+  if (etag) h['If-None-Match'] = etag;
+  const res = await request(url, { headers: h, cache: 'no-store' }, 'Чтение каталога');
+  if (res.status === 304) return { doc: null, sha: null, etag, notModified: true };
+  if (res.status === 404) return { doc: null, sha: null, etag: '', notModified: false };
   if (res.status === 401 || res.status === 403) {
     throw new Error('GitHub не пустил. Если репозиторий приватный — вставьте токен, если публичный — проверьте имя и ветку.');
   }
   if (!res.ok) throw new Error(`GitHub ответил ${res.status}`);
   const data = await res.json();
   const doc = data.content ? JSON.parse(base64ToUtf8(data.content)) : null;
-  return { doc, sha: data.sha };
+  /* the header is only readable when GitHub exposes it to the browser; without
+     it there is nothing to send back next time, and the caller has to poll
+     more rarely instead */
+  return { doc, sha: data.sha, etag: res.headers.get('etag') || '', notModified: false };
 }
 
 /** Write the document back. `sha` is null for the first save. */

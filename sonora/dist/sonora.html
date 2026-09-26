@@ -7338,24 +7338,36 @@ function checkToken(cfg) {
 }
 
 /**
- * Read the document. Returns { doc, sha } — sha is what a later write needs.
+ * Read the document. Returns { doc, sha, etag, notModified } — sha is what a
+ * later write needs, etag is what makes the next read cheap.
  * A missing file is not an error: it just means nothing has been saved yet.
+ *
+ * Pass the etag from the previous read and GitHub answers 304 when nothing
+ * changed. That matters more than it looks: a 304 does not count against the
+ * rate limit, so a page may watch the file as often as it likes, while a full
+ * read costs one of the 60 requests an hour GitHub allows an anonymous caller.
  */
-async function fetchRemote() {
+async function fetchRemote({ etag = '' } = {}) {
   const cfg = remoteConfig();
   const { owner, name } = parseRepo(cfg.repo);
   if (!cfg.branch.trim()) throw new Error('Укажите ветку.');
   if (!cfg.path.trim()) throw new Error('Укажите путь к файлу.');
   const url = `${API}/repos/${owner}/${name}/contents/${cfg.path}?ref=${encodeURIComponent(cfg.branch)}`;
-  const res = await request(url, { headers: headers(cfg.token), cache: 'no-store' }, 'Чтение каталога');
-  if (res.status === 404) return { doc: null, sha: null };
+  const h = headers(cfg.token);
+  if (etag) h['If-None-Match'] = etag;
+  const res = await request(url, { headers: h, cache: 'no-store' }, 'Чтение каталога');
+  if (res.status === 304) return { doc: null, sha: null, etag, notModified: true };
+  if (res.status === 404) return { doc: null, sha: null, etag: '', notModified: false };
   if (res.status === 401 || res.status === 403) {
     throw new Error('GitHub не пустил. Если репозиторий приватный — вставьте токен, если публичный — проверьте имя и ветку.');
   }
   if (!res.ok) throw new Error(`GitHub ответил ${res.status}`);
   const data = await res.json();
   const doc = data.content ? JSON.parse(base64ToUtf8(data.content)) : null;
-  return { doc, sha: data.sha };
+  /* the header is only readable when GitHub exposes it to the browser; without
+     it there is nothing to send back next time, and the caller has to poll
+     more rarely instead */
+  return { doc, sha: data.sha, etag: res.headers.get('etag') || '', notModified: false };
 }
 
 /** Write the document back. `sha` is null for the first save. */
@@ -7429,6 +7441,8 @@ let timer = 0;
 let inFlight = null;
 /** this browser holds tracks the shared file does not — never let a file win silently */
 let pendingPublish = false;
+/** ETag of the last read, so the watcher's next question costs nothing */
+let watchEtag = '';
 
 const emit = () => {
   for (const fn of listeners) {
@@ -7464,8 +7478,9 @@ async function initSync() {
   }
   set('loading', 'Читаю каталог…');
   try {
-    const { doc, sha: fileSha } = await fetchRemote();
+    const { doc, sha: fileSha, etag } = await fetchRemote();
     sha = fileSha;
+    watchEtag = etag;
     if (!doc) {
       pendingPublish = admin.library().length > 0;
       set(pendingPublish ? 'diverged' : 'readonly',
@@ -7505,6 +7520,90 @@ async function initSync() {
 /** True when this browser holds tracks the shared file does not. */
 function hasLocalOnly() {
   return pendingPublish;
+}
+
+/* ==========================================================================
+   Watching the file
+   --------------------------------------------------------------------------
+   Saving in the panel writes a file in the repository. Everyone else finds out
+   the next time they load the page - which is the whole problem: a phone left
+   open on the table keeps showing yesterday's shelf.
+
+   So the page asks the file whether it changed, on a timer and again whenever
+   the tab comes back to the front. The question is a conditional request
+   carrying the ETag from the last read, and GitHub answers 304 without spending
+   any of the anonymous caller's hourly requests. That is what makes watching
+   affordable: a minute of polling costs nothing, while a full read every
+   minute would use the whole hourly budget in an hour.
+
+   When the answer is "yes" the file is merged exactly the way startup merges
+   it, so a device never loses its own unsaved tracks to somebody else's edit.
+   ========================================================================== */
+
+/** with a usable ETag a 304 is free, so we can be quick about it */
+const WATCH_FAST = 60_000;
+/** without one every check is a full read, and the budget is 60 an hour */
+const WATCH_SLOW = 5 * 60_000;
+
+let watchTimer = 0;
+let watchBusy = false;
+let watching = false;
+let onRemoteChange = null;
+let isPanelBusy = null;
+
+async function poll() {
+  if (watchBusy || inFlight) return;
+  /* never redraw the panel under the admin's hands */
+  if (isPanelBusy && isPanelBusy()) return;
+  watchBusy = true;
+  try {
+    const res = await fetchRemote({ etag: watchEtag });
+    if (res.notModified) return;
+    watchEtag = res.etag;
+    if (!res.doc || res.sha === sha) return;
+
+    sha = res.sha;
+    const before = admin.library().length;
+    admin.load(res.doc);
+    player.reconcile();
+    const after = admin.library().length;
+    /* the merge keeps whatever this device had, so the "only here" warning is
+       not this event's business - it belongs to the next full load */
+    if (onRemoteChange) onRemoteChange({ added: after - before, total: after });
+  } catch (err) {
+    /* a failed check is not news: say it once in the console and try again
+       on the next tick rather than interrupting whoever is listening */
+    console.warn('[sync] не удалось проверить файл каталога', err);
+  } finally {
+    watchBusy = false;
+  }
+}
+
+/**
+ * Start watching. `isBusy` should tell whether the admin panel is open with
+ * unsaved edits; `onChange` hears about a catalogue that changed elsewhere.
+ */
+function startWatch({ busy, onChange } = {}) {
+  if (watching) return;
+  watching = true;
+  isPanelBusy = busy || null;
+  onRemoteChange = onChange || null;
+
+  const tick = () => {
+    clearTimeout(watchTimer);
+    watchTimer = setTimeout(async () => {
+      await poll();
+      tick();
+    }, watchEtag ? WATCH_FAST : WATCH_SLOW);
+  };
+  tick();
+
+  /* coming back to the tab is the moment staleness is visible, so ask at once
+     instead of making someone wait out the rest of the interval */
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') poll();
+  });
+  window.addEventListener('online', () => poll());
 }
 
 /** Called after anything the admin commits. One write per burst of edits. */
@@ -7570,7 +7669,7 @@ function disableSync() {
 /* the play state is the one thing worth keeping out of the shared document */
 const isShared = () => remoteReadable();
 
-return { status, onSyncChange, initSync, hasLocalOnly, markDirty, syncNow, testSync, disableSync, isShared };
+return { status, onSyncChange, initSync, hasLocalOnly, startWatch, markDirty, syncNow, testSync, disableSync, isShared };
 });
 
 __mod("scripts/ui/sidebar.js", function () {
@@ -9578,7 +9677,7 @@ function buildSync() {
   return el('div', { class: 'adm-stack' }, [
     el('div', { class: 'adm-add' }, [
       el('h3', { text: 'Где хранится каталог' }),
-      el('p', { class: 'adm-note', text: 'Каталог лежит файлом в репозитории и читается оттуда при каждой загрузке страницы — на любом устройстве, без входа и без настройки. Настройки ниже нужны только для записи: чтобы панель могла сохранять.' }),
+      el('p', { class: 'adm-note', text: 'Каталог лежит файлом в репозитории и читается оттуда — на любом устройстве, без входа и без настройки. Открытая страница сама спрашивает, не изменился ли файл, и обновляет полку без перезагрузки: обычно в течение минуты, а если вкладку вернули к себе — сразу. Настройки ниже нужны только для записи: чтобы панель могла сохранять.' }),
       el('div', { class: 'adm-grid adm-grid--one' }, [
         field('Репозиторий', input(draft.repo, (v) => set('repo', v), { placeholder: 'maksim8560/music-app' })),
         field('Ветка', input(draft.branch, (v) => set('branch', v), { placeholder: 'Main' })),
@@ -9765,6 +9864,14 @@ function switchTab(name) {
   if (name === 'password') renderPassword();
 }
 
+/**
+ * The watcher asks before it redraws anything: a catalogue that arrives while
+ * the admin has half-made edits would move the fields out from under them.
+ */
+function isAdminOpen() {
+  return open;
+}
+
 function close() {
   if (!root) return;
   closeSheet(root);
@@ -9840,7 +9947,7 @@ function initAdmin() {
 
 
 
-return { "applyAdminSite": applySite, close, openAdmin, initAdmin };
+return { "applyAdminSite": applySite, isAdminOpen, close, openAdmin, initAdmin };
 });
 
 __mod("scripts/ui/shortcuts.js", function () {
@@ -10232,8 +10339,8 @@ const { renderQueue: renderQueue } = __req("scripts/ui/queue.js");
 const { initTransport: initTransport, syncTrack: syncTrack, syncState: syncState, syncVolume: syncVolume, syncLike: syncLike } = __req("scripts/ui/transport.js");
 const { initPalette: initPalette, open: openPalette, paletteShortcut: paletteShortcut } = __req("scripts/ui/palette.js");
 const { initSettings: initSettings, applyTheme: applyTheme, openSettingsSheet: openSettingsSheet, openQueueSheet: openQueueSheet } = __req("scripts/ui/settings.js");
-const { initAdmin: initAdmin, openAdmin: openAdmin } = __req("scripts/ui/admin.js");
-const { initSync: initSync } = __req("scripts/data/sync.js");
+const { initAdmin: initAdmin, openAdmin: openAdmin, isAdminOpen: isAdminOpen } = __req("scripts/ui/admin.js");
+const { initSync: initSync, startWatch: startWatch } = __req("scripts/data/sync.js");
 const { admin: admin } = __req("scripts/data/admin.js");
 const { initShortcuts: initShortcuts } = __req("scripts/ui/shortcuts.js");
 const { createVisualizers: createVisualizers } = __req("scripts/ui/visualizer.js");
@@ -10599,6 +10706,23 @@ function boot() {
      first paint so a slow or unreachable GitHub never delays the page opening;
      when it lands, reconcile() puts the shelf in place. */
   initSync();
+  /* Someone else can save while this tab is open. Watching the file is what
+     keeps a phone that has been lying on the table from showing a shelf that
+     was replaced ten minutes ago - the check is a conditional request, so a
+     minute of polling costs nothing against GitHub's hourly limit. */
+  startWatch({
+    busy: isAdminOpen,
+    onChange: ({ added, total }) => {
+      renderSidePlaylists();
+      if (added > 0) {
+        toast(`Каталог обновился: ${plural(added, 'новый трек', 'новых трека', 'новых треков')}`, 'ok', 4000);
+      } else if (added < 0) {
+        toast(`Каталог обновился: убрано ${plural(-added, 'трек', 'трека', 'треков')}`, 'info', 4000);
+      } else {
+        toast(`Каталог обновлён с другого устройства — ${plural(total, 'трек', 'трека', 'треков')}`, 'info', 4000);
+      }
+    },
+  });
   syncTrack();
   syncState();
   updateCounters();
