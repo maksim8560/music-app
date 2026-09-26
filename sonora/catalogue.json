@@ -9,8 +9,27 @@
   },
   "overrides": {},
   "hidden": [],
-  "custom": [],
+  "custom": [
+    {
+      "id": "radio-1",
+      "title": "Test",
+      "artist": "Test",
+      "album": "Test",
+      "year": 2026,
+      "genre": "Радио",
+      "genreKey": "local",
+      "duration": 0,
+      "colors": [
+        "#ff7a6b",
+        "#ffc46b"
+      ],
+      "blurb": "Test",
+      "url": "http://air.volna.top/Retro",
+      "source": "stream",
+      "custom": true
+    }
+  ],
   "playlists": [],
-  "updatedAt": 1790458535111,
-  "exportedAt": "2026-09-26T21:35:45.577Z"
+  "updatedAt": 1790458713408,
+  "exportedAt": "2026-09-26T21:38:34.613Z"
 }
