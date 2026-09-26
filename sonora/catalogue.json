@@ -2,7 +2,7 @@
   "version": 1,
   "site": {
     "name": "Sonora",
-    "tagline": "МУЗЫКАЛЬНЫЙ ПЛЕЕР",
+    "tagline": "Музыка для души...",
     "description": "ПРИВЕТ",
     "accent": "",
     "background": "sonora/catalogue.json"
@@ -31,6 +31,7 @@
     }
   ],
   "playlists": [],
-  "updatedAt": 1790459983565,
-  "exportedAt": "2026-09-26T21:59:46.453Z"
+  "genres": [],
+  "updatedAt": 1790460232052,
+  "exportedAt": "2026-09-26T22:03:58.252Z"
 }
