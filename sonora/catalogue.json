@@ -26,10 +26,11 @@
       "blurb": "Ретро музыка для души...",
       "url": "http://air.volna.top/Retro",
       "source": "stream",
-      "custom": true
+      "custom": true,
+      "coverUrl": "https://ru.volna.top/wp-content/uploads/logoretro-2.png"
     }
   ],
   "playlists": [],
-  "updatedAt": 1790459125223,
-  "exportedAt": "2026-09-26T21:45:31.967Z"
+  "updatedAt": 1790459293983,
+  "exportedAt": "2026-09-26T21:48:15.184Z"
 }
