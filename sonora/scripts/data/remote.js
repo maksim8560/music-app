@@ -17,6 +17,13 @@
 const CONFIG_KEY = 'sonora.remote.v1';
 const API = 'https://api.github.com';
 
+/** Where the catalogue lives out of the box — no setup to see it working. */
+const DEFAULTS = {
+  repo: 'maksim8560/music-app',
+  branch: 'Main',
+  path: 'sonora/catalogue.json',
+};
+
 const utf8ToBase64 = (text) => {
   const bytes = new TextEncoder().encode(text);
   let bin = '';
@@ -34,16 +41,16 @@ const base64ToUtf8 = (b64) => {
 export function remoteConfig() {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    if (!raw) return { repo: '', branch: 'Main', path: 'sonora/catalogue.json', token: '' };
+    if (!raw) return { repo: DEFAULTS.repo, branch: DEFAULTS.branch, path: DEFAULTS.path, token: '' };
     const saved = JSON.parse(raw);
     return {
-      repo: typeof saved.repo === 'string' ? saved.repo : '',
-      branch: saved.branch || 'Main',
-      path: saved.path || 'sonora/catalogue.json',
+      repo: typeof saved.repo === 'string' ? saved.repo : DEFAULTS.repo,
+      branch: saved.branch || DEFAULTS.branch,
+      path: saved.path || DEFAULTS.path,
       token: typeof saved.token === 'string' ? saved.token : '',
     };
   } catch {
-    return { repo: '', branch: 'Main', path: 'sonora/catalogue.json', token: '' };
+    return { repo: DEFAULTS.repo, branch: DEFAULTS.branch, path: DEFAULTS.path, token: '' };
   }
 }
 
@@ -53,7 +60,17 @@ export function saveRemoteConfig(patch) {
   return next;
 }
 
-export function remoteEnabled() {
+/**
+ * Reading needs no token at all: a public repository hands out the file to
+ * anyone who asks. Only writing needs one. Keeping those apart is the whole
+ * difference between "the catalogue shows up on my phone with no setup" and
+ * "I have to configure something before I can even see my own music".
+ */
+export function remoteReadable() {
+  return true; // the defaults already point at a repository
+}
+
+export function remoteWritable() {
   const c = remoteConfig();
   return Boolean(c.repo && c.token);
 }
@@ -69,11 +86,16 @@ function parseRepo(repo) {
   return { owner: parts[parts.length - 2], name: parts[parts.length - 1] };
 }
 
-const headers = (token) => ({
-  Accept: 'application/vnd.github+json',
-  Authorization: `Bearer ${token}`,
-  'X-GitHub-Api-Version': '2022-11-28',
-});
+const headers = (token) => {
+  const h = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  /* a token is only attached when there is one: a public file reads fine
+     without it, and asking for one we do not have would only invite a 401 */
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
+};
 
 /**
  * Anything can come out of a fetch: a network failure, a CORS refusal, or a
@@ -95,7 +117,7 @@ async function request(url, init, what) {
 
 /** A token that cannot be a token: catch it before the network does. */
 function checkToken(cfg) {
-  if (!cfg.token) throw new Error('Введите токен GitHub.');
+  if (!cfg.token) throw new Error('Введите токен GitHub — без него каталог можно читать, но не записывать.');
   if (!/^[\x21-\x7e]+$/.test(cfg.token)) {
     throw new Error('Токен содержит недопустимые символы. Обычный токен — латиница, цифры, дефис и подчёркивание.');
   }
@@ -110,12 +132,13 @@ function checkToken(cfg) {
 export async function fetchRemote() {
   const cfg = remoteConfig();
   const { owner, name } = parseRepo(cfg.repo);
-  checkToken(cfg);
+  if (!cfg.branch.trim()) throw new Error('Укажите ветку.');
+  if (!cfg.path.trim()) throw new Error('Укажите путь к файлу.');
   const url = `${API}/repos/${owner}/${name}/contents/${cfg.path}?ref=${encodeURIComponent(cfg.branch)}`;
   const res = await request(url, { headers: headers(cfg.token), cache: 'no-store' }, 'Чтение каталога');
   if (res.status === 404) return { doc: null, sha: null };
   if (res.status === 401 || res.status === 403) {
-    throw new Error('GitHub не пустил с этим токеном. Проверьте, что он сохранён и что у него есть доступ к репозиторию.');
+    throw new Error('GitHub не пустил. Если репозиторий приватный — вставьте токен, если публичный — проверьте имя и ветку.');
   }
   if (!res.ok) throw new Error(`GitHub ответил ${res.status}`);
   const data = await res.json();

@@ -2628,6 +2628,30 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
   border-left-color: #ffc46b;
 }
 
+.adm-details {
+  border-top: 1px solid var(--glass-line);
+  padding-top: var(--gap-3);
+  margin-top: var(--gap-2);
+}
+.adm-details summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--text-2);
+  list-style: none;
+}
+.adm-details summary::-webkit-details-marker { display: none; }
+.adm-details summary::before { content: '▸ '; color: var(--text-3); }
+.adm-details[open] summary::before { content: '▾ '; }
+.adm-details ol {
+  margin: var(--gap-2) 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
 /* the one place that says plainly what the password is and is not */
 .adm-warn {
   border-color: color-mix(in oklab, #ffc46b 35%, transparent);
@@ -4967,6 +4991,9 @@ const SESSION_KEY = 'sonora.admin.session';
 /** Glyphs a playlist may carry — all of them already in the sprite. */
 const PLAYLIST_ICONS = ['note', 'disc', 'wave', 'heart', 'queue', 'spark', 'list', 'grid'];
 
+/** See setup(): the hash is public, so short passwords are no protection. */
+const MIN_PASSWORD = 8;
+
 /** Fields an admin may override on a shipped track. */
 const EDITABLE = [
   'title', 'artist', 'album', 'year', 'genre', 'genreKey',
@@ -5127,7 +5154,12 @@ class Admin {
   /** First visit: set the password. Returns false if one already exists. */
   async setup(password) {
     if (this.hasPassword) return false;
-    if (!password || password.length < 4) throw new Error('Пароль от 4 символов');
+    /* The hash ends up in a file anyone can read, so a four-character password
+       is not a secret at all. Eight is the floor here and a phrase is what
+       actually makes sense. */
+    if (!password || password.length < MIN_PASSWORD) {
+      throw new Error(`Пароль от ${MIN_PASSWORD} символов — лучше длинная фраза`);
+    }
     this.#state.auth = await makeAuth(password);
     write(this.#state);
     this.#authed = true;
@@ -5147,7 +5179,7 @@ class Admin {
 
   async changePassword(current, next) {
     if (!(await this.login(current))) throw new Error('Текущий пароль не подходит');
-    if (!next || next.length < 4) throw new Error('Новый пароль от 4 символов');
+    if (!next || next.length < MIN_PASSWORD) throw new Error(`Новый пароль от ${MIN_PASSWORD} символов — лучше длинная фраза`);
     this.#state.auth = await makeAuth(next);
     write(this.#state);
     return true;
@@ -5513,7 +5545,7 @@ function clampNum(value, min, max, fallback) {
 
 const admin = new Admin();
 
-return { PLAYLIST_ICONS, admin };
+return { PLAYLIST_ICONS, MIN_PASSWORD, admin };
 });
 
 __mod("scripts/audio/files.js", function () {
@@ -6932,6 +6964,13 @@ __mod("scripts/data/remote.js", function () {
 const CONFIG_KEY = 'sonora.remote.v1';
 const API = 'https://api.github.com';
 
+/** Where the catalogue lives out of the box — no setup to see it working. */
+const DEFAULTS = {
+  repo: 'maksim8560/music-app',
+  branch: 'Main',
+  path: 'sonora/catalogue.json',
+};
+
 const utf8ToBase64 = (text) => {
   const bytes = new TextEncoder().encode(text);
   let bin = '';
@@ -6949,16 +6988,16 @@ const base64ToUtf8 = (b64) => {
 function remoteConfig() {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    if (!raw) return { repo: '', branch: 'Main', path: 'sonora/catalogue.json', token: '' };
+    if (!raw) return { repo: DEFAULTS.repo, branch: DEFAULTS.branch, path: DEFAULTS.path, token: '' };
     const saved = JSON.parse(raw);
     return {
-      repo: typeof saved.repo === 'string' ? saved.repo : '',
-      branch: saved.branch || 'Main',
-      path: saved.path || 'sonora/catalogue.json',
+      repo: typeof saved.repo === 'string' ? saved.repo : DEFAULTS.repo,
+      branch: saved.branch || DEFAULTS.branch,
+      path: saved.path || DEFAULTS.path,
       token: typeof saved.token === 'string' ? saved.token : '',
     };
   } catch {
-    return { repo: '', branch: 'Main', path: 'sonora/catalogue.json', token: '' };
+    return { repo: DEFAULTS.repo, branch: DEFAULTS.branch, path: DEFAULTS.path, token: '' };
   }
 }
 
@@ -6968,7 +7007,17 @@ function saveRemoteConfig(patch) {
   return next;
 }
 
-function remoteEnabled() {
+/**
+ * Reading needs no token at all: a public repository hands out the file to
+ * anyone who asks. Only writing needs one. Keeping those apart is the whole
+ * difference between "the catalogue shows up on my phone with no setup" and
+ * "I have to configure something before I can even see my own music".
+ */
+function remoteReadable() {
+  return true; // the defaults already point at a repository
+}
+
+function remoteWritable() {
   const c = remoteConfig();
   return Boolean(c.repo && c.token);
 }
@@ -6984,11 +7033,16 @@ function parseRepo(repo) {
   return { owner: parts[parts.length - 2], name: parts[parts.length - 1] };
 }
 
-const headers = (token) => ({
-  Accept: 'application/vnd.github+json',
-  Authorization: `Bearer ${token}`,
-  'X-GitHub-Api-Version': '2022-11-28',
-});
+const headers = (token) => {
+  const h = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  /* a token is only attached when there is one: a public file reads fine
+     without it, and asking for one we do not have would only invite a 401 */
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
+};
 
 /**
  * Anything can come out of a fetch: a network failure, a CORS refusal, or a
@@ -7010,7 +7064,7 @@ async function request(url, init, what) {
 
 /** A token that cannot be a token: catch it before the network does. */
 function checkToken(cfg) {
-  if (!cfg.token) throw new Error('Введите токен GitHub.');
+  if (!cfg.token) throw new Error('Введите токен GitHub — без него каталог можно читать, но не записывать.');
   if (!/^[\x21-\x7e]+$/.test(cfg.token)) {
     throw new Error('Токен содержит недопустимые символы. Обычный токен — латиница, цифры, дефис и подчёркивание.');
   }
@@ -7025,12 +7079,13 @@ function checkToken(cfg) {
 async function fetchRemote() {
   const cfg = remoteConfig();
   const { owner, name } = parseRepo(cfg.repo);
-  checkToken(cfg);
+  if (!cfg.branch.trim()) throw new Error('Укажите ветку.');
+  if (!cfg.path.trim()) throw new Error('Укажите путь к файлу.');
   const url = `${API}/repos/${owner}/${name}/contents/${cfg.path}?ref=${encodeURIComponent(cfg.branch)}`;
   const res = await request(url, { headers: headers(cfg.token), cache: 'no-store' }, 'Чтение каталога');
   if (res.status === 404) return { doc: null, sha: null };
   if (res.status === 401 || res.status === 403) {
-    throw new Error('GitHub не пустил с этим токеном. Проверьте, что он сохранён и что у него есть доступ к репозиторию.');
+    throw new Error('GitHub не пустил. Если репозиторий приватный — вставьте токен, если публичный — проверьте имя и ветку.');
   }
   if (!res.ok) throw new Error(`GitHub ответил ${res.status}`);
   const data = await res.json();
@@ -7078,7 +7133,7 @@ async function checkRemote() {
   };
 }
 
-return { remoteConfig, saveRemoteConfig, remoteEnabled, fetchRemote, pushRemote, checkRemote };
+return { remoteConfig, saveRemoteConfig, remoteReadable, remoteWritable, fetchRemote, pushRemote, checkRemote };
 });
 
 __mod("scripts/data/sync.js", function () {
@@ -7096,7 +7151,7 @@ __mod("scripts/data/sync.js", function () {
    ========================================================================== */
 
 const { admin: admin } = __req("scripts/data/admin.js");
-const { remoteEnabled: remoteEnabled, remoteConfig: remoteConfig, fetchRemote: fetchRemote, pushRemote: pushRemote, checkRemote: checkRemote } = __req("scripts/data/remote.js");
+const { remoteEnabled: remoteEnabled, remoteReadable: remoteReadable, remoteWritable: remoteWritable, remoteConfig: remoteConfig, fetchRemote: fetchRemote, pushRemote: pushRemote, checkRemote: checkRemote } = __req("scripts/data/remote.js");
 const { store: store } = __req("scripts/core/store.js");
 const { player: player } = __req("scripts/core/player.js");
 
@@ -7121,7 +7176,7 @@ const set = (next, text = '') => {
 };
 
 function status() {
-  return { state, message, enabled: remoteEnabled(), repo: remoteConfig().repo };
+  return { state, message, enabled: remoteWritable(), readable: remoteReadable(), repo: remoteConfig().repo };
 }
 
 function onSyncChange(fn) {
@@ -7136,36 +7191,38 @@ function onSyncChange(fn) {
  * not open at all because a repository is unreachable helps nobody.
  */
 async function initSync() {
-  if (!remoteEnabled()) {
+  if (!remoteReadable()) {
     set('off');
     return;
   }
-  set('loading', 'Читаю каталог из репозитория…');
+  set('loading', 'Читаю каталог…');
   try {
     const { doc, sha: fileSha } = await fetchRemote();
     sha = fileSha;
     if (doc) {
       admin.load(doc);
       player.reconcile();
-      set('idle', 'Каталог взят из репозитория');
+      set(remoteWritable() ? 'idle' : 'readonly', 'Каталог взят из репозитория');
     } else {
-      set('idle', 'Файла ещё нет — он появится при первом сохранении');
+      set('readonly', 'Файла каталога ещё нет — он появится, как только вы сохраните его из панели');
     }
   } catch (err) {
+    /* A catalogue we could not read must never stop the page from opening:
+       the browser's own copy, if any, is still shown. */
     set('error', String(err.message || err));
   }
 }
 
 /** Called after anything the admin commits. One write per burst of edits. */
 function markDirty() {
-  if (!remoteEnabled()) return;
+  if (!remoteWritable()) return;
   clearTimeout(timer);
   timer = setTimeout(() => { syncNow(); }, 1200);
 }
 
 async function syncNow() {
-  if (!remoteEnabled()) {
-    set('off');
+  if (!remoteWritable()) {
+    set(remoteReadable() ? 'readonly' : 'off', 'Токен не задан: каталог читается, но записать его отсюда нельзя');
     return false;
   }
   /* never run two writes at once: the second would race the first and lose */
@@ -7207,16 +7264,16 @@ async function testSync() {
   }
 }
 
-/** Forget the token and go back to this browser only. */
+/** Forget the token. Reading keeps working: a public file needs none. */
 function disableSync() {
   clearTimeout(timer);
   sha = null;
   localStorage.removeItem('sonora.remote.v1');
-  set('off');
+  set(remoteReadable() ? 'readonly' : 'off', 'Токен удалён: каталог читается, запись из браузера отключена');
 }
 
 /* the play state is the one thing worth keeping out of the shared document */
-const isShared = () => remoteEnabled() && store.get('settings') !== undefined;
+const isShared = () => remoteReadable();
 
 return { status, onSyncChange, initSync, markDirty, syncNow, testSync, disableSync, isShared };
 });
@@ -8442,6 +8499,7 @@ const { player: player } = __req("scripts/core/player.js");
 const { admin: admin, PLAYLIST_ICONS: PLAYLIST_ICONS } = __req("scripts/data/admin.js");
 const { remoteConfig: remoteConfig, saveRemoteConfig: saveRemoteConfig } = __req("scripts/data/remote.js");
 const { onSyncChange: onSyncChange, syncNow: syncNow, testSync: testSync, disableSync: disableSync, markDirty: markDirty } = __req("scripts/data/sync.js");
+const { remoteWritable: remoteWritable } = __req("scripts/data/remote.js");
 const { GENRES: GENRES } = __req("scripts/data/tracks.js");
 const { SCALES: SCALES } = __req("scripts/audio/synth.js");
 const { openSheet: openSheet, closeSheet: closeSheet, initSheet: initSheet } = __req("scripts/ui/sheet.js");
@@ -8569,7 +8627,7 @@ function buildGate() {
       el('button', { class: 'primary-btn', type: 'submit', text: admin.hasPassword ? 'Войти' : 'Задать пароль и войти' }),
       button('Отмена', () => close(), 'ghost-btn'),
     ]),
-    el('p', { class: 'adm-note', text: 'Настройки и музыка лежат в этом браузере. Пароль защищает панель от случайного открытия, а не от того, у кого есть доступ к файлам.' }),
+    el('p', { class: 'adm-note', text: 'Пароль защищает панель от случайного открытия, а не от того, у кого есть доступ к файлам. Каталог виден всем, кто читает репозиторий, поэтому ставьте длинную фразу.' }),
   ]);
 
   return form;
@@ -9074,6 +9132,7 @@ function buildSync() {
     statusLine.dataset.state = s.state;
     const map = {
       off: 'Отключено: каталог и плейлисты хранятся только в этом браузере.',
+      readonly: s.message,
       idle: s.message,
       loading: s.message,
       saving: s.message,
@@ -9085,17 +9144,18 @@ function buildSync() {
   const off = onSyncChange(paint);
 
   const set = (k, v) => { draft[k] = v; };
+  const hasToken = Boolean(draft.token);
 
   return el('div', { class: 'adm-stack' }, [
     el('div', { class: 'adm-add' }, [
-      el('h3', { text: 'Где хранить каталог' }),
-      el('p', { class: 'adm-note', text: 'Укажите репозиторий и токен — и всё, что вы сохраняете, будет записываться файлом в репозиторий. На любом другом устройстве достаточно обновить страницу: полка, обложки и плейлисты приедут оттуда.' }),
+      el('h3', { text: 'Где хранится каталог' }),
+      el('p', { class: 'adm-note', text: 'Каталог лежит файлом в репозитории и читается оттуда при каждой загрузке страницы — на любом устройстве, без входа и без настройки. Настройки ниже нужны только для записи: чтобы панель могла сохранять.' }),
       el('div', { class: 'adm-grid adm-grid--one' }, [
         field('Репозиторий', input(draft.repo, (v) => set('repo', v), { placeholder: 'maksim8560/music-app' })),
         field('Ветка', input(draft.branch, (v) => set('branch', v), { placeholder: 'Main' })),
         field('Путь к файлу', input(draft.path, (v) => set('path', v), { placeholder: 'sonora/catalogue.json' })),
-        field('Токен', input(draft.token, (v) => set('token', v.trim()), { type: 'password', placeholder: 'github_pat_…' }),
-          'Тонкий токен (fine-grained) с доступом только к этому репозиторию и только на чтение и запись содержимого. Он хранится в этом браузере и в файл не попадает.'),
+        field('Токен (только для записи)', input(draft.token, (v) => set('token', v.trim()), { type: 'password', placeholder: 'github_pat_…' }),
+          'Тонкий токен (fine-grained): доступ только к этому репозиторию и только на чтение и запись содержимого. Хранится в этом браузере, в файл не попадает.'),
       ]),
       error,
       el('div', { class: 'adm-add__row' }, [
@@ -9105,27 +9165,35 @@ function buildSync() {
           const ok = await testSync();
           if (ok) {
             renderSync();
-            catalogueChanged('Синхронизация включена');
+            catalogueChanged(remoteWritable() ? 'Запись включена' : 'Проверено: каталог читается');
           }
         } }),
         el('button', { class: 'ghost-btn', type: 'button', text: 'Сохранить сейчас', onclick: async () => {
           saveRemoteConfig({ ...draft });
           await syncNow();
         } }),
-        el('button', { class: 'ghost-btn ghost-btn--danger', type: 'button', text: 'Отключить', onclick: () => {
+        el('button', { class: 'ghost-btn ghost-btn--danger', type: 'button', text: 'Забыть токен', onclick: () => {
           disableSync();
           renderSync();
-          toast('Синхронизация отключена, каталог снова только в этом браузере', 'info', 4000);
         } }),
       ]),
       statusLine,
+      el('details', { class: 'adm-details' }, [
+        el('summary', { text: 'Как получить токен' }),
+        el('ol', {}, [
+          el('li', { text: 'Откройте github.com/settings/personal-access-tokens/new и создайте тонкий токен (fine-grained).' }),
+          el('li', { text: 'В поле Repository выберите только maksim8560/music-app.' }),
+          el('li', { text: 'Разрешения Repository permissions → Contents: Read and write. Больше ничего трогать не нужно.' }),
+          el('li', { text: 'Задайте короткий срок действия и вставьте токен в поле выше.' }),
+        ]),
+        el('p', { class: 'adm-note', text: 'Токен даёт доступ к репозиторию от вашего имени. Держите его в тайне и не присылайте никому в переписке.' }),
+      ]),
     ]),
 
     el('div', { class: 'adm-add adm-warn' }, [
-      el('h3', { text: 'Про пароль — честно' }),
-      el('p', { text: 'Пароль панели не граница безопасности. Он хранится как хеш с солью, и если каталог лежит в публичном репозитории, этот хеш видят все, кто может читать репозиторий. Короткий пароль из шести цифр перебирается за секунды, поэтому не полагайтесь на него.' }),
-      el('p', { text: 'Что действительно защищает запись — токен GitHub. Пока он есть только у вас, писать в репозиторий можете только вы. Если он утечёт, доступ получает тот, кто его нашёл, поэтому у токена должны быть минимальные права и короткий срок.' }),
-      el('p', { text: 'Пароль в панели остаётся как удобная блокировка от случайного открытия — чтобы сосед или ребёнок не наткнулся на настройки. Для такой роли подходит любая длинная фраза.' }),
+      el('h3', { text: 'Про пароль — коротко' }),
+      el('p', { text: 'Пароль панели хранится как хеш с солью, и файл лежит в публичном репозитории — значит этот хеш видят все, кто читает репозиторий. Короткий пароль из шести цифр перебирается за секунды, поэтому ставьте длинную фразу: её роль не в том, чтобы остановить взлом, а в том, чтобы никто не открыл панель случайно.' }),
+      el('p', { text: 'Запись защищает токен: пока он есть только у вас, изменить каталог может только он.' }),
     ]),
   ]);
 }

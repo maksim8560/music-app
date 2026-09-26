@@ -17,6 +17,9 @@ const SESSION_KEY = 'sonora.admin.session';
 /** Glyphs a playlist may carry — all of them already in the sprite. */
 export const PLAYLIST_ICONS = ['note', 'disc', 'wave', 'heart', 'queue', 'spark', 'list', 'grid'];
 
+/** See setup(): the hash is public, so short passwords are no protection. */
+export const MIN_PASSWORD = 8;
+
 /** Fields an admin may override on a shipped track. */
 const EDITABLE = [
   'title', 'artist', 'album', 'year', 'genre', 'genreKey',
@@ -177,7 +180,12 @@ class Admin {
   /** First visit: set the password. Returns false if one already exists. */
   async setup(password) {
     if (this.hasPassword) return false;
-    if (!password || password.length < 4) throw new Error('Пароль от 4 символов');
+    /* The hash ends up in a file anyone can read, so a four-character password
+       is not a secret at all. Eight is the floor here and a phrase is what
+       actually makes sense. */
+    if (!password || password.length < MIN_PASSWORD) {
+      throw new Error(`Пароль от ${MIN_PASSWORD} символов — лучше длинная фраза`);
+    }
     this.#state.auth = await makeAuth(password);
     write(this.#state);
     this.#authed = true;
@@ -197,7 +205,7 @@ class Admin {
 
   async changePassword(current, next) {
     if (!(await this.login(current))) throw new Error('Текущий пароль не подходит');
-    if (!next || next.length < 4) throw new Error('Новый пароль от 4 символов');
+    if (!next || next.length < MIN_PASSWORD) throw new Error(`Новый пароль от ${MIN_PASSWORD} символов — лучше длинная фраза`);
     this.#state.auth = await makeAuth(next);
     write(this.#state);
     return true;

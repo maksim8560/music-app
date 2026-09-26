@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "site": {
+    "name": "Sonora",
+    "tagline": "Glass Edition",
+    "description": "",
+    "accent": "",
+    "background": ""
+  },
+  "overrides": {},
+  "hidden": [],
+  "custom": [],
+  "playlists": []
+}

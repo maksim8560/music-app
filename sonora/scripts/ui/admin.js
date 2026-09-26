@@ -20,6 +20,7 @@ import { player } from '../core/player.js';
 import { admin, PLAYLIST_ICONS } from '../data/admin.js';
 import { remoteConfig, saveRemoteConfig } from '../data/remote.js';
 import { onSyncChange, syncNow, testSync, disableSync, markDirty } from '../data/sync.js';
+import { remoteWritable } from '../data/remote.js';
 import { GENRES } from '../data/tracks.js';
 import { SCALES } from '../audio/synth.js';
 import { openSheet, closeSheet, initSheet } from './sheet.js';
@@ -147,7 +148,7 @@ function buildGate() {
       el('button', { class: 'primary-btn', type: 'submit', text: admin.hasPassword ? 'Войти' : 'Задать пароль и войти' }),
       button('Отмена', () => close(), 'ghost-btn'),
     ]),
-    el('p', { class: 'adm-note', text: 'Настройки и музыка лежат в этом браузере. Пароль защищает панель от случайного открытия, а не от того, у кого есть доступ к файлам.' }),
+    el('p', { class: 'adm-note', text: 'Пароль защищает панель от случайного открытия, а не от того, у кого есть доступ к файлам. Каталог виден всем, кто читает репозиторий, поэтому ставьте длинную фразу.' }),
   ]);
 
   return form;
@@ -652,6 +653,7 @@ function buildSync() {
     statusLine.dataset.state = s.state;
     const map = {
       off: 'Отключено: каталог и плейлисты хранятся только в этом браузере.',
+      readonly: s.message,
       idle: s.message,
       loading: s.message,
       saving: s.message,
@@ -663,17 +665,18 @@ function buildSync() {
   const off = onSyncChange(paint);
 
   const set = (k, v) => { draft[k] = v; };
+  const hasToken = Boolean(draft.token);
 
   return el('div', { class: 'adm-stack' }, [
     el('div', { class: 'adm-add' }, [
-      el('h3', { text: 'Где хранить каталог' }),
-      el('p', { class: 'adm-note', text: 'Укажите репозиторий и токен — и всё, что вы сохраняете, будет записываться файлом в репозиторий. На любом другом устройстве достаточно обновить страницу: полка, обложки и плейлисты приедут оттуда.' }),
+      el('h3', { text: 'Где хранится каталог' }),
+      el('p', { class: 'adm-note', text: 'Каталог лежит файлом в репозитории и читается оттуда при каждой загрузке страницы — на любом устройстве, без входа и без настройки. Настройки ниже нужны только для записи: чтобы панель могла сохранять.' }),
       el('div', { class: 'adm-grid adm-grid--one' }, [
         field('Репозиторий', input(draft.repo, (v) => set('repo', v), { placeholder: 'maksim8560/music-app' })),
         field('Ветка', input(draft.branch, (v) => set('branch', v), { placeholder: 'Main' })),
         field('Путь к файлу', input(draft.path, (v) => set('path', v), { placeholder: 'sonora/catalogue.json' })),
-        field('Токен', input(draft.token, (v) => set('token', v.trim()), { type: 'password', placeholder: 'github_pat_…' }),
-          'Тонкий токен (fine-grained) с доступом только к этому репозиторию и только на чтение и запись содержимого. Он хранится в этом браузере и в файл не попадает.'),
+        field('Токен (только для записи)', input(draft.token, (v) => set('token', v.trim()), { type: 'password', placeholder: 'github_pat_…' }),
+          'Тонкий токен (fine-grained): доступ только к этому репозиторию и только на чтение и запись содержимого. Хранится в этом браузере, в файл не попадает.'),
       ]),
       error,
       el('div', { class: 'adm-add__row' }, [
@@ -683,27 +686,35 @@ function buildSync() {
           const ok = await testSync();
           if (ok) {
             renderSync();
-            catalogueChanged('Синхронизация включена');
+            catalogueChanged(remoteWritable() ? 'Запись включена' : 'Проверено: каталог читается');
           }
         } }),
         el('button', { class: 'ghost-btn', type: 'button', text: 'Сохранить сейчас', onclick: async () => {
           saveRemoteConfig({ ...draft });
           await syncNow();
         } }),
-        el('button', { class: 'ghost-btn ghost-btn--danger', type: 'button', text: 'Отключить', onclick: () => {
+        el('button', { class: 'ghost-btn ghost-btn--danger', type: 'button', text: 'Забыть токен', onclick: () => {
           disableSync();
           renderSync();
-          toast('Синхронизация отключена, каталог снова только в этом браузере', 'info', 4000);
         } }),
       ]),
       statusLine,
+      el('details', { class: 'adm-details' }, [
+        el('summary', { text: 'Как получить токен' }),
+        el('ol', {}, [
+          el('li', { text: 'Откройте github.com/settings/personal-access-tokens/new и создайте тонкий токен (fine-grained).' }),
+          el('li', { text: 'В поле Repository выберите только maksim8560/music-app.' }),
+          el('li', { text: 'Разрешения Repository permissions → Contents: Read and write. Больше ничего трогать не нужно.' }),
+          el('li', { text: 'Задайте короткий срок действия и вставьте токен в поле выше.' }),
+        ]),
+        el('p', { class: 'adm-note', text: 'Токен даёт доступ к репозиторию от вашего имени. Держите его в тайне и не присылайте никому в переписке.' }),
+      ]),
     ]),
 
     el('div', { class: 'adm-add adm-warn' }, [
-      el('h3', { text: 'Про пароль — честно' }),
-      el('p', { text: 'Пароль панели не граница безопасности. Он хранится как хеш с солью, и если каталог лежит в публичном репозитории, этот хеш видят все, кто может читать репозиторий. Короткий пароль из шести цифр перебирается за секунды, поэтому не полагайтесь на него.' }),
-      el('p', { text: 'Что действительно защищает запись — токен GitHub. Пока он есть только у вас, писать в репозиторий можете только вы. Если он утечёт, доступ получает тот, кто его нашёл, поэтому у токена должны быть минимальные права и короткий срок.' }),
-      el('p', { text: 'Пароль в панели остаётся как удобная блокировка от случайного открытия — чтобы сосед или ребёнок не наткнулся на настройки. Для такой роли подходит любая длинная фраза.' }),
+      el('h3', { text: 'Про пароль — коротко' }),
+      el('p', { text: 'Пароль панели хранится как хеш с солью, и файл лежит в публичном репозитории — значит этот хеш видят все, кто читает репозиторий. Короткий пароль из шести цифр перебирается за секунды, поэтому ставьте длинную фразу: её роль не в том, чтобы остановить взлом, а в том, чтобы никто не открыл панель случайно.' }),
+      el('p', { text: 'Запись защищает токен: пока он есть только у вас, изменить каталог может только он.' }),
     ]),
   ]);
 }

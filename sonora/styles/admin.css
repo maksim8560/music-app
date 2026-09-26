@@ -422,6 +422,30 @@
   border-left-color: #ffc46b;
 }
 
+.adm-details {
+  border-top: 1px solid var(--glass-line);
+  padding-top: var(--gap-3);
+  margin-top: var(--gap-2);
+}
+.adm-details summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--text-2);
+  list-style: none;
+}
+.adm-details summary::-webkit-details-marker { display: none; }
+.adm-details summary::before { content: '▸ '; color: var(--text-3); }
+.adm-details[open] summary::before { content: '▾ '; }
+.adm-details ol {
+  margin: var(--gap-2) 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
 /* the one place that says plainly what the password is and is not */
 .adm-warn {
   border-color: color-mix(in oklab, #ffc46b 35%, transparent);
