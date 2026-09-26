@@ -62,6 +62,17 @@ canvas { display: block; }
 
 svg { display: block; flex: none; }
 
+/* The sprite is drawn as outlines, so anything that puts a <use> on the page
+   needs these three properties. Each container used to declare them for itself
+   and several did not, and a <use> with no rule falls back to the SVG default:
+   black fill, no stroke. On a dark panel that reads as a black blob, and a
+   glyph made of plain lines - like #i-list - disappears completely, which is
+   how "Все треки" ended up with no icon at all. Set once, here.
+   Glyphs that are meant to be solid carry fill="currentColor" on their own
+   paths, and a presentation attribute beats an inherited value, so they are
+   unaffected. */
+svg { stroke: currentColor; fill: none; stroke-width: 1.6; }
+
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
 kbd {

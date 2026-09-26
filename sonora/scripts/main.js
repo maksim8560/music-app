@@ -215,15 +215,19 @@ function initNav() {
 }
 
 /* ==========================================================================
-   File import (button + drag & drop)
+   File import (drag & drop)
+   --------------------------------------------------------------------------
+   There used to be a "Загрузить" button in the top bar. It was removed: files
+   are dropped onto the page or picked from the empty shelf, and a permanent
+   button in the header spent space on a door that is already open everywhere
+   else. Dropping and the empty shelf still work.
    ========================================================================== */
 function initImport() {
   const input = qs('#file-input');
   const drop = qs('#drop');
   let depth = 0;
 
-  on(qs('#btn-import'), 'click', () => input.click());
-  /* the empty shelf offers the same two doors, right where the eye already is */
+  /* the empty shelf offers the two doors, right where the eye already is */
   on(qs('#btn-empty-upload'), 'click', () => input.click());
   on(qs('#btn-empty-admin'), 'click', () => openAdmin('music', { expandAdd: true }));
 

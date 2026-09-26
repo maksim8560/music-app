@@ -58,7 +58,13 @@ export function renderSidePlaylists() {
     btn.dataset.filter = `pl:${p.id}`;
     if (filter === `pl:${p.id}`) btn.classList.add('is-active');
     btn.append(svgIcon(p.icon));
-    btn.append(document.createTextNode(p.name));
+    /* the name lives in a span so the collapsed rail can hide it: a bare text
+       node has no selector, and the overflow it caused is what made the rail
+       look broken */
+    const name = document.createElement('span');
+    name.className = 'side-list__name';
+    name.textContent = p.name;
+    btn.append(name);
     if (p.count) {
       const em = document.createElement('em');
       em.textContent = String(p.count);
@@ -87,6 +93,12 @@ export function initSidebarPlaylists() {
 
   const openEditor = () => {
     if (editor) { editor.querySelector('input')?.focus(); return; }
+    /* A name typed into a 78px rail is a name nobody can read. Widen the panel
+       first, then put the cursor in the field. */
+    if (store.get('rail')) {
+      player.setRail(false);
+      qs('.app')?.setAttribute('data-rail', 'false');
+    }
     const li = document.createElement('li');
     li.className = 'side-list__new';
     const input = document.createElement('input');

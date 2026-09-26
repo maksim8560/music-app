@@ -495,6 +495,13 @@
 
 /* ==========================================================================
    Rail mode (collapsed sidebar)
+   --------------------------------------------------------------------------
+   Icons only, and nothing may overflow: the rail is 78px wide, so a single
+   visible word spills out of it and over the library. Every label therefore
+   goes, not just the inactive ones - the active playlist used to keep its name
+   and hang out of the panel. The little spectrum is dropped as well: sixteen
+   bars squeezed into 44px are sixteen specks, and the hero already shows a
+   real one.
    ========================================================================== */
 .app[data-rail="true"] { --sidebar-w: 78px; }
 .app[data-rail="true"] .sidebar { padding-inline: var(--gap-2); align-items: center; }
@@ -502,14 +509,34 @@
 .app[data-rail="true"] .nav__item span,
 .app[data-rail="true"] .nav__count,
 .app[data-rail="true"] .sidebar__label,
-.app[data-rail="true"] .side-list__item:not(.is-active),
-.app[data-rail="true"] .sidebar__hint { display: none; }
-.app[data-rail="true"] .nav__item { justify-content: center; padding-inline: 0; width: 46px; }
+.app[data-rail="true"] .side-list__name,
+.app[data-rail="true"] .side-list__add span,
+.app[data-rail="true"] .side-list__item em,
+.app[data-rail="true"] .side-list__empty,
+.app[data-rail="true"] .side-list__new,
+.app[data-rail="true"] .sidebar__hint,
+.app[data-rail="true"] .spectrum-mini { display: none; }
+.app[data-rail="true"] .nav__item,
+.app[data-rail="true"] .side-list__item,
+.app[data-rail="true"] .side-list__add {
+  justify-content: center;
+  padding-inline: 0;
+  width: 46px;
+}
+/* Brand and the expand chevron sat side by side, which needs about 100px and
+   the rail is 78 - so the chevron hung out over the library. Stacked, both
+   fit and the way back in stays where a thumb expects it. */
+.app[data-rail="true"] .sidebar__top {
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 2px 0 0;
+}
+.app[data-rail="true"] .brand { justify-content: center; }
+.app[data-rail="true"] .sidebar__collapse { width: 36px; height: 36px; }
 .app[data-rail="true"] .side-list { display: flex; flex-direction: column; align-items: center; }
-.app[data-rail="true"] .side-list__item.is-active { justify-content: center; }
 .app[data-rail="true"] .sidebar__collapse svg { transform: none; }
 .app[data-rail="true"] .sidebar__foot { justify-items: center; }
-.app[data-rail="true"] .spectrum-mini { width: 44px; gap: 2px; }
 
 /* ==========================================================================
    Responsive
