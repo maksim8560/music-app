@@ -9659,66 +9659,28 @@ function buildSync() {
     ]),
 
     el('div', { class: 'adm-add adm-warn' }, [
-      el('h3', { text: 'Про пароль — коротко' }),
-      el('p', { text: 'Пароль панели хранится как хеш с солью, и файл лежит в публичном репозитории — значит этот хеш видят все, кто читает репозиторий. Короткий пароль из шести цифр перебирается за секунды, поэтому ставьте длинную фразу: её роль не в том, чтобы остановить взлом, а в том, чтобы никто не открыл панель случайно.' }),
-      el('p', { text: 'Запись защищает токен: пока он есть только у вас, изменить каталог может только он.' }),
-    ]),
-  ]);
-}
-
-/* --------------------------------- access -------------------------------- */
-
-/**
- * Where the token lives, and how to get rid of it.
- *
- * This replaced a "Пароль" tab, and the tab it replaced was a mistake worth
- * stating plainly: the password was hashed and salted, and the hash still sat
- * in the same localStorage as the token, one key away, in a public repository.
- * It guarded nothing, and it looked like it guarded something.
- */
-function buildAccess() {
-  const cfg = remoteConfig();
-  const mask = (t) => (t.length > 8 ? `${t.slice(0, 4)}…${t.slice(-4)}` : '••••');
-
-  return el('div', { class: 'adm-grid adm-grid--one' }, [
-    el('div', { class: 'adm-add' }, [
-      el('h3', { text: 'Токен в этом браузере' }),
-      el('p', { class: 'adm-note', text: cfg.token
-        ? `Сохранён: ${mask(cfg.token)}. Панель открывается без ввода.`
-        : 'Не задан — панель попросит токен при следующем открытии.' }),
-      el('div', { class: 'adm-add__row' }, [
-        button(cfg.token ? 'Забыть токен' : 'Ввести токен', () => {
-          if (cfg.token) {
-            disableSync();
-            admin.logout();
-            showGate();
-            renderSync();
-            toast('Токен забыт — панель снова спросит его', 'info');
-          } else {
-            showGate();
-          }
-        }, cfg.token ? 'ghost-btn ghost-btn--danger' : 'primary-btn'),
-      ]),
-    ]),
-
-    el('div', { class: 'adm-add' }, [
-      el('h3', { text: 'Что здесь вообще защищено' }),
+      el('h3', { text: 'Про защиту — коротко' }),
       el('p', { text: 'Токен — и только он. Он лежит в этом браузере и даёт право записывать каталог в репозиторий. Пока он есть только у вас, изменить музыку на сайте может только он.' }),
       el('p', { text: 'Пароля у панели нет. Он стоял рядом с токеном в том же хранилище, поэтому не защищал ничего, а выглядел так, будто защищал. Второй замок без первой двери — это не защита, а вид её.' }),
       el('p', { text: 'Сама панель — не дверь. Дверь — токен: с ним файл каталога пишется напрямую через GitHub, вообще без этого интерфейса.' }),
-      el('p', { text: 'Что делать, если браузер открыт: «Забыть токен» выше. В режиме инкогнито хранилище не переживает закрытие вкладки — токен придётся ввести заново, и это ожидаемо.' }),
+      el('p', { text: 'В режиме инкогнито хранилище не переживает закрытие вкладки — токен придётся ввести заново, и это ожидаемо.' }),
     ]),
   ]);
 }
 
 /* --------------------------------- shell -------------------------------- */
 
+/* There was a "Пароль" tab here, and it was the wrong thing to ship. The hash
+   sat in the same localStorage as the token, one key away, in a public
+   repository, so it guarded nothing while looking as though it did. The tab is
+   gone rather than renamed: the token field, the "Забыть токен" button and the
+   short honest note about what is actually protected all live in
+   "Синхронизация", which is where the token already was. */
 const TABS = [
   ['site', 'Сайт'],
   ['music', 'Музыка'],
   ['playlists', 'Плейлисты'],
   ['sync', 'Синхронизация'],
-  ['access', 'Доступ'],
 ];
 
 function showGate() {
@@ -9741,7 +9703,6 @@ function showPanel() {
   renderMusic();
   renderPlaylists();
   renderSync();
-  renderAccess();
   /* the add form may have been asked for from the empty shelf */
   if (pendingExpand) {
     pendingExpand = false;
@@ -9759,13 +9720,6 @@ function expandAddForm() {
   extra.querySelector('input')?.focus();
   return true;
 }
-let accessHost = null;
-const renderAccess = () => {
-  /* looked up per call: the hosts only exist once the panel is in the DOM */
-  const host = accessHost || qs('#adm-access');
-  if (host) host.replaceChildren(buildAccess());
-};
-
 const renderSite = () => {
   const host = qs('#adm-site');
   if (host) host.replaceChildren(buildSite());
@@ -9792,7 +9746,6 @@ function switchTab(name) {
   if (name === 'music') renderMusic();
   if (name === 'playlists') renderPlaylists();
   if (name === 'sync') renderSync();
-  if (name === 'access') renderAccess();
 }
 
 /**
@@ -9857,7 +9810,6 @@ function build() {
           el('section', { 'data-tab': 'music', hidden: true }, [el('div', { id: 'adm-music' })]),
           el('section', { 'data-tab': 'playlists', hidden: true }, [el('div', { id: 'adm-playlists' })]),
           el('section', { 'data-tab': 'sync', hidden: true }, [el('div', { id: 'adm-sync' })]),
-          el('section', { 'data-tab': 'access', hidden: true }, [el('div', { id: 'adm-access' })]),
         ]),
       ]),
     ]),
