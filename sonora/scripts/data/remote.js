@@ -145,7 +145,19 @@ export async function fetchRemote({ etag = '' } = {}) {
   if (etag) h['If-None-Match'] = etag;
   const res = await request(url, { headers: h, cache: 'no-store' }, 'Чтение каталога');
   if (res.status === 304) return { doc: null, sha: null, etag, notModified: true };
-  if (res.status === 404) return { doc: null, sha: null, etag: '', notModified: false };
+  if (res.status === 404) {
+    /* A wrong repository name and a file that was never saved both come back as
+       404, and they call for opposite responses: one is a typo to fix, the
+       other is an empty shelf waiting to be filled. Guessing "nothing saved
+       yet" is the worse of the two - it invites re-adding music that is
+       already in the repository. So ask whether the repository itself is there,
+       which costs one request and only in this case. */
+    const repoRes = await request(`${API}/repos/${owner}/${name}`, { headers: h, cache: 'no-store' }, 'Проверка репозитория');
+    if (repoRes.status === 404) {
+      throw new Error(`Репозиторий «${cfg.repo}» не найден. Проверьте название — без него каталог прочитать нельзя.`);
+    }
+    return { doc: null, sha: null, etag: '', notModified: false };
+  }
   /* 403 means two very different things, and telling a reader to paste a token
      when the real problem is an exhausted hourly budget wastes their time.
      GitHub says which one it is in the remaining-requests header. */
@@ -190,7 +202,13 @@ export async function pushRemote(doc, sha) {
     'Запись каталога',
   );
   if (res.status === 401 || res.status === 403) {
-    throw new Error('GitHub не пустил с этим токеном при записи.');
+    /* Flagged, not just phrased: a rejected token is a different situation from
+       a network hiccup, and it needs a different reply - the panel has to say
+       "this token is dead, enter the new one" instead of leaving a line of red
+       text in a corner while the button looks like it did nothing. */
+    const err = new Error('GitHub не пустил с этим токеном при записи.');
+    err.auth = true;
+    throw err;
   }
   if (res.status === 409 || res.status === 422) {
     throw new Error('Файл в репозитории изменился, пока вы редактировали. Обновите страницу и повторите.');
@@ -210,4 +228,15 @@ export async function checkRemote() {
     tracks: doc ? (doc.custom?.length || 0) : 0,
     playlists: doc ? (doc.playlists?.length || 0) : 0,
   };
+}
+
+/**
+ * True when GitHub refused the token itself rather than the request.
+ *
+ * Worth separating: a revoked or expired token does not fix itself, and the
+ * owner's next step is to enter the new one. Everything else - a dead network,
+ * an exhausted hourly budget - is worth retrying quietly.
+ */
+export function isAuthError(err) {
+  return Boolean(err && err.auth);
 }

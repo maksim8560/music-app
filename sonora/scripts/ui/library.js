@@ -10,7 +10,12 @@ import { player } from '../core/player.js';
 import { art } from './artwork.js';
 import { GENRES } from '../data/tracks.js';
 import { admin } from '../data/admin.js';
+import { status as syncStatus, onSyncChange } from '../data/sync.js';
 import { toast } from './toast.js';
+
+/** the shared file's read state, as a word and as a sentence */
+const syncState = () => syncStatus().state;
+const syncMessage = () => syncStatus().message;
 
 const listEl = document.getElementById('track-list');
 const countEl = document.getElementById('lib-count');
@@ -137,19 +142,31 @@ export function renderLibrary() {
   emptyEl.hidden = list.length > 0;
   listEl.hidden = list.length === 0;
 
-  /* Two different reasons to be empty: a filter that matched nothing, or no
-     music at all. The second one needs a way out, not a "reset filters" that
-     would do nothing. */
+  /* Three different reasons to be empty, and the third one used to look like
+     the first: a filter that matched nothing, no music at all, and no music
+     *because the shared file could not be read*. That last one is what a dead
+     network or an exhausted GitHub rate limit looks like, and it was reported
+     as "0 треков" with nothing else - which reads as data loss, and sends you
+     looking for a problem you do not have. So say which one it is. */
   const filtered = !!(store.get('search') || store.get('filter') !== 'all');
   const shelfEmpty = player.library.length === 0;
+  const unreadable = shelfEmpty && syncState() === 'error';
   const text = document.getElementById('empty-text');
   const hint = document.getElementById('empty-hint');
   const reset = document.getElementById('btn-reset');
-  if (text) text.textContent = shelfEmpty ? 'Музыки пока нет' : 'Ничего не найдено';
-  if (hint) hint.hidden = !shelfEmpty;
+  if (text) {
+    if (unreadable) text.textContent = 'Общий каталог не прочитан';
+    else text.textContent = shelfEmpty ? 'Музыки пока нет' : 'Ничего не найдено';
+  }
+  if (hint) {
+    hint.hidden = !shelfEmpty;
+    if (unreadable) hint.textContent = syncMessage();
+  }
   if (reset) reset.hidden = !filtered;
-  document.getElementById('btn-empty-admin').hidden = !shelfEmpty;
-  document.getElementById('btn-empty-upload').hidden = !shelfEmpty;
+  /* offering "add music" when the shelf only looks empty would invite someone
+     to re-add tracks that are already in the repository */
+  document.getElementById('btn-empty-admin').hidden = !shelfEmpty || unreadable;
+  document.getElementById('btn-empty-upload').hidden = !shelfEmpty || unreadable;
 
   document.getElementById('btn-clear-filters').hidden = !filtered;
 }
@@ -166,6 +183,16 @@ function headingFor(filter, search) {
     local: 'Загруженное',
   }[filter] || GENRES[filter]?.label || 'Все треки';
 }
+
+/**
+ * The empty shelf has to be able to explain itself, which means it has to be
+ * redrawn when the answer changes: the file may fail to read after the shelf
+ * has already rendered, and the note should appear on its own.
+ */
+onSyncChange(() => {
+  const shelf = document.getElementById('empty-state');
+  if (shelf && !shelf.hidden) renderLibrary();
+});
 
 /** Patch the rows without a full re-render (current track, likes) */
 export function syncLibrary() {

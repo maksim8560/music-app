@@ -889,6 +889,7 @@ function showPanel() {
   renderMusic();
   renderPlaylists();
   renderSync();
+  renderTokenBanner();
   /* the add form may have been asked for from the empty shelf */
   if (pendingExpand) {
     pendingExpand = false;
@@ -920,6 +921,50 @@ const renderSync = () => {
   const host = qs('#adm-sync');
   if (host) host.replaceChildren(buildSync());
 };
+
+/**
+ * A token that GitHub has stopped accepting.
+ *
+ * Worth shouting about, because nothing else on the page looks broken: the
+ * panel opens, the shelf is there, and only the save quietly does nothing.
+ * That is exactly what a revoked token looks like, and the owner's next step -
+ * enter the new one - is not guessable from a status line in a corner.
+ */
+let tokenRejected = false;
+
+function renderTokenBanner() {
+  const host = qs('#adm-token-banner');
+  if (!host) return;
+  if (!tokenRejected) {
+    host.hidden = true;
+    host.replaceChildren();
+    return;
+  }
+  host.hidden = false;
+  host.replaceChildren(el('div', { class: 'adm-add adm-warn' }, [
+    el('h3', { text: 'Токен больше не работает' }),
+    el('p', { text: 'GitHub его отклонил — значит токен отозван или истёк. Новый токен работает, старый нет: отзыв делается только на стороне GitHub, само создание нового токена ничего не отменяет.' }),
+    el('div', { class: 'adm-add__row' }, [
+      el('button', { class: 'primary-btn', type: 'button', text: 'Ввести новый токен', onclick: () => {
+        disableSync();
+        admin.logout();
+        showGate();
+      } }),
+    ]),
+  ]));
+}
+
+/**
+ * Watch the write state while the panel is open, so a token that has stopped
+ * working says so instead of leaving the save button looking inert.
+ */
+function watchTokenHealth() {
+  onSyncChange((s) => {
+    if (s.state !== 'error' || !s.auth) return;
+    tokenRejected = true;
+    renderTokenBanner();
+  });
+}
 
 function switchTab(name) {
   for (const btn of qsa('#adm-tabs button')) {
@@ -991,6 +1036,7 @@ function build() {
             class: 'adm-tab', type: 'button', role: 'tab', 'data-tab': key,
             onclick: () => switchTab(key), text: label,
           }))),
+        el('div', { id: 'adm-token-banner', hidden: true }),
         el('div', { class: 'adm-sections', id: 'adm-sections' }, [
           el('section', { 'data-tab': 'site' }, [el('div', { class: 'adm-section__body', id: 'adm-site' })]),
           el('section', { 'data-tab': 'music', hidden: true }, [el('div', { id: 'adm-music' })]),
@@ -1019,6 +1065,7 @@ export function initAdmin() {
   applySite();
   /* keep the badge honest if the session is already open */
   setBadge(admin.authed ? 'on' : 'off');
+  watchTokenHealth();
 }
 
 export { applySite as applyAdminSite };

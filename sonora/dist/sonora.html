@@ -6921,276 +6921,6 @@ const player = new Player();
 return { LOCAL_PREFIX, player };
 });
 
-__mod("scripts/ui/library.js", function () {
-/* ==========================================================================
-   ui/library.js — the track list
-   Renders rows, patches state on updates, supports drag-to-reorder and a
-   small context menu of actions per track.
-   ========================================================================== */
-
-const { el: el, icon: icon, fmtTime: fmtTime, plural: plural, on: on } = __req("scripts/core/dom.js");
-const { store: store } = __req("scripts/core/store.js");
-const { player: player } = __req("scripts/core/player.js");
-const { art: art } = __req("scripts/ui/artwork.js");
-const { GENRES: GENRES } = __req("scripts/data/tracks.js");
-const { admin: admin } = __req("scripts/data/admin.js");
-const { toast: toast } = __req("scripts/ui/toast.js");
-
-const listEl = document.getElementById('track-list');
-const countEl = document.getElementById('lib-count');
-const headingEl = document.getElementById('lib-heading');
-const emptyEl = document.getElementById('empty-state');
-const libraryEl = document.getElementById('library');
-const rows = new Map();
-
-let dragId = null;
-
-/* ------------------------------ row markup ------------------------------ */
-function buildRow(track, index) {
-  const liked = player.isLiked(track.id);
-  const isCurrent = store.get('currentId') === track.id;
-
-  const canvas = el('canvas', { width: 88, height: 88, 'aria-hidden': 'true' });
-
-  const num = el('span', { class: 'track__num', html: isCurrent && store.get('playing') ? icon('wave', 15) : String(index + 1) });
-
-  const artBox = el('div', { class: 'track__art' },
-    canvas,
-    el('span', { class: 'art__badge' }),
-    num,
-  );
-
-  const genre = GENRES[track.genreKey]?.label ?? track.genre;
-  const meta = el('div', { class: 'track__meta' },
-    el('div', { class: 'track__title', text: track.title }),
-    el('div', { class: 'track__sub' },
-      el('span', { text: track.artist }),
-      el('i', { text: '·' }),
-      el('span', { text: track.album }),
-      el('i', { text: '·' }),
-      el('span', { text: String(track.year) }),
-    ),
-  );
-
-  const tail = el('div', { class: 'track__tail' },
-    el('span', { class: `track__badge${track.source === 'file' ? ' track__badge--local' : ''}`, text: track.source === 'file' ? 'Файл' : genre }),
-    el('span', { class: 'track__time', text: track.duration ? fmtTime(track.duration) : '—:—' }),
-  );
-
-  const likeBtn = el('button', {
-    class: `icon-btn icon-btn--sm${liked ? ' is-on' : ''}`,
-    'aria-pressed': liked ? 'true' : 'false',
-    'aria-label': liked ? 'Убрать из избранного' : 'В избранное',
-    html: icon('heart', 16),
-    onclick: (e) => {
-      e.stopPropagation();
-      const on2 = player.toggleLike(track.id);
-      likeBtn.classList.toggle('is-on', on2);
-      likeBtn.setAttribute('aria-pressed', String(on2));
-    },
-  });
-
-  const nextBtn = el('button', {
-    class: 'icon-btn icon-btn--sm',
-    'aria-label': 'Играть следующим',
-    title: 'Играть следующим',
-    html: icon('queue', 16),
-    onclick: (e) => {
-      e.stopPropagation();
-      player.playNext(track.id);
-    },
-  });
-
-  const actions = [likeBtn, nextBtn];
-  if (track.source === 'file') {
-    actions.push(el('button', {
-      class: 'icon-btn icon-btn--sm',
-      'aria-label': 'Удалить из библиотеки',
-      title: 'Удалить',
-      html: icon('trash', 16),
-      onclick: (e) => {
-        e.stopPropagation();
-        player.removeLocal(track.id);
-        toast(`«${track.title}» удалён`, 'info');
-      },
-    }));
-  }
-
-  const row = el('li', {
-    class: `track${isCurrent ? ' is-current' : ''}`,
-    dataset: { id: track.id },
-    draggable: 'true',
-    tabindex: '0',
-    role: 'button',
-    'aria-label': `${track.title}, ${track.artist}`,
-  },
-    el('span', { class: 'track__ripple' }),
-    artBox,
-    meta,
-    tail,
-    el('div', { class: 'track__act' }, ...actions),
-  );
-
-  row.style.setProperty('--i', index);
-  row.__canvas = canvas;
-  row.__num = num;
-  row.__like = likeBtn;
-  row.__index = index;
-  return row;
-}
-
-/* -------------------------------- render -------------------------------- */
-function renderLibrary() {
-  const list = player.visible();
-  const frag = document.createDocumentFragment();
-  rows.clear();
-
-  list.forEach((track, i) => {
-    const row = buildRow(track, i);
-    rows.set(track.id, row);
-    frag.append(row);
-  });
-
-  listEl.replaceChildren(frag);
-  /* paint after insertion so the canvases can read their real size */
-  for (const [id, row] of rows) art.paint(row.__canvas, player.byId(id));
-  listEl.classList.toggle('stagger', true);
-  libraryEl.dataset.layout = store.get('view');
-  countEl.textContent = plural(list.length, 'трек', 'трека', 'треков');
-  headingEl.textContent = headingFor(store.get('filter'), store.get('search'));
-  emptyEl.hidden = list.length > 0;
-  listEl.hidden = list.length === 0;
-
-  /* Two different reasons to be empty: a filter that matched nothing, or no
-     music at all. The second one needs a way out, not a "reset filters" that
-     would do nothing. */
-  const filtered = !!(store.get('search') || store.get('filter') !== 'all');
-  const shelfEmpty = player.library.length === 0;
-  const text = document.getElementById('empty-text');
-  const hint = document.getElementById('empty-hint');
-  const reset = document.getElementById('btn-reset');
-  if (text) text.textContent = shelfEmpty ? 'Музыки пока нет' : 'Ничего не найдено';
-  if (hint) hint.hidden = !shelfEmpty;
-  if (reset) reset.hidden = !filtered;
-  document.getElementById('btn-empty-admin').hidden = !shelfEmpty;
-  document.getElementById('btn-empty-upload').hidden = !shelfEmpty;
-
-  document.getElementById('btn-clear-filters').hidden = !filtered;
-}
-
-function headingFor(filter, search) {
-  if (search) return `Поиск: «${search}»`;
-  if (typeof filter === 'string' && filter.startsWith('pl:')) {
-    return admin.playlist(filter.slice(3))?.name || 'Плейлист';
-  }
-  return {
-    all: 'Все треки',
-    liked: 'Избранное',
-    recent: 'Недавнее',
-    local: 'Загруженное',
-  }[filter] || GENRES[filter]?.label || 'Все треки';
-}
-
-/** Patch the rows without a full re-render (current track, likes) */
-function syncLibrary() {
-  const cur = store.get('currentId');
-  const playing = store.get('playing');
-  for (const [id, row] of rows) {
-    const isCurrent = id === cur;
-    row.classList.toggle('is-current', isCurrent);
-    row.__num.innerHTML = isCurrent
-      ? (playing ? icon('wave', 15) : icon('pause', 13))
-      : String(row.__index + 1);
-    const liked = player.isLiked(id);
-    row.__like.classList.toggle('is-on', liked);
-    row.__like.setAttribute('aria-pressed', String(liked));
-  }
-}
-
-/* ------------------------------ interaction ----------------------------- */
-on(listEl, 'click', (e) => {
-  const row = e.target.closest('.track');
-  if (!row) return;
-  const id = row.dataset.id;
-  if (e.target.closest('button')) return;
-  player.play(id);
-});
-
-on(listEl, 'keydown', (e) => {
-  const row = e.target.closest('.track');
-  if (!row) return;
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    player.play(row.dataset.id);
-  }
-  if (e.key === 'ArrowDown' && row.nextElementSibling) {
-    e.preventDefault();
-    row.nextElementSibling.focus();
-  }
-  if (e.key === 'ArrowUp' && row.previousElementSibling) {
-    e.preventDefault();
-    row.previousElementSibling.focus();
-  }
-});
-
-/* pointer ripple, positioned from the pointer */
-on(listEl, 'pointerdown', (e) => {
-  const row = e.target.closest('.track');
-  if (!row) return;
-  const rect = row.getBoundingClientRect();
-  row.style.setProperty('--rx', `${e.clientX - rect.left}px`);
-  row.style.setProperty('--ry', `${e.clientY - rect.top}px`);
-});
-
-/* ---------------------------- drag to reorder --------------------------- */
-on(listEl, 'dragstart', (e) => {
-  const row = e.target.closest('.track');
-  if (!row) return;
-  dragId = row.dataset.id;
-  row.classList.add('is-dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', dragId);
-});
-
-on(listEl, 'dragend', () => {
-  dragId = null;
-  for (const row of rows.values()) row.classList.remove('is-dragging', 'is-over');
-});
-
-on(listEl, 'dragover', (e) => {
-  if (!dragId) return;
-  e.preventDefault();
-  const row = e.target.closest('.track');
-  for (const r of rows.values()) r.classList.toggle('is-over', r === row && r.dataset.id !== dragId);
-});
-
-on(listEl, 'drop', (e) => {
-  if (!dragId) return;
-  e.preventDefault();
-  const row = e.target.closest('.track');
-  const targetId = row?.dataset.id;
-  if (!targetId || targetId === dragId) return;
-
-  const order = [...(store.get('order') || [])];
-  const from = order.indexOf(dragId);
-  const to = order.indexOf(targetId);
-  if (from < 0 || to < 0) return;
-  order.splice(to, 0, order.splice(from, 1)[0]);
-  store.set({ order });
-  renderLibrary();
-});
-
-/* keep art in sync with the viewport (lazy canvases start blank at 0×0) */
-on(window, 'resize', () => {
-  for (const [id, row] of rows) {
-    const track = player.byId(id);
-    if (track) art.paint(row.__canvas, track);
-  }
-});
-
-return { renderLibrary, syncLibrary };
-});
-
 __mod("scripts/data/remote.js", function () {
 /* ==========================================================================
    data/remote.js — the catalogue as a file in the repository
@@ -7339,7 +7069,19 @@ async function fetchRemote({ etag = '' } = {}) {
   if (etag) h['If-None-Match'] = etag;
   const res = await request(url, { headers: h, cache: 'no-store' }, 'Чтение каталога');
   if (res.status === 304) return { doc: null, sha: null, etag, notModified: true };
-  if (res.status === 404) return { doc: null, sha: null, etag: '', notModified: false };
+  if (res.status === 404) {
+    /* A wrong repository name and a file that was never saved both come back as
+       404, and they call for opposite responses: one is a typo to fix, the
+       other is an empty shelf waiting to be filled. Guessing "nothing saved
+       yet" is the worse of the two - it invites re-adding music that is
+       already in the repository. So ask whether the repository itself is there,
+       which costs one request and only in this case. */
+    const repoRes = await request(`${API}/repos/${owner}/${name}`, { headers: h, cache: 'no-store' }, 'Проверка репозитория');
+    if (repoRes.status === 404) {
+      throw new Error(`Репозиторий «${cfg.repo}» не найден. Проверьте название — без него каталог прочитать нельзя.`);
+    }
+    return { doc: null, sha: null, etag: '', notModified: false };
+  }
   /* 403 means two very different things, and telling a reader to paste a token
      when the real problem is an exhausted hourly budget wastes their time.
      GitHub says which one it is in the remaining-requests header. */
@@ -7384,7 +7126,13 @@ async function pushRemote(doc, sha) {
     'Запись каталога',
   );
   if (res.status === 401 || res.status === 403) {
-    throw new Error('GitHub не пустил с этим токеном при записи.');
+    /* Flagged, not just phrased: a rejected token is a different situation from
+       a network hiccup, and it needs a different reply - the panel has to say
+       "this token is dead, enter the new one" instead of leaving a line of red
+       text in a corner while the button looks like it did nothing. */
+    const err = new Error('GitHub не пустил с этим токеном при записи.');
+    err.auth = true;
+    throw err;
   }
   if (res.status === 409 || res.status === 422) {
     throw new Error('Файл в репозитории изменился, пока вы редактировали. Обновите страницу и повторите.');
@@ -7406,7 +7154,18 @@ async function checkRemote() {
   };
 }
 
-return { remoteConfig, saveRemoteConfig, remoteReadable, remoteWritable, fetchRemote, pushRemote, checkRemote };
+/**
+ * True when GitHub refused the token itself rather than the request.
+ *
+ * Worth separating: a revoked or expired token does not fix itself, and the
+ * owner's next step is to enter the new one. Everything else - a dead network,
+ * an exhausted hourly budget - is worth retrying quietly.
+ */
+function isAuthError(err) {
+  return Boolean(err && err.auth);
+}
+
+return { remoteConfig, saveRemoteConfig, remoteReadable, remoteWritable, fetchRemote, pushRemote, checkRemote, isAuthError };
 });
 
 __mod("scripts/data/sync.js", function () {
@@ -7424,7 +7183,7 @@ __mod("scripts/data/sync.js", function () {
    ========================================================================== */
 
 const { admin: admin } = __req("scripts/data/admin.js");
-const { remoteReadable: remoteReadable, remoteWritable: remoteWritable, remoteConfig: remoteConfig, fetchRemote: fetchRemote, pushRemote: pushRemote, checkRemote: checkRemote } = __req("scripts/data/remote.js");
+const { remoteReadable: remoteReadable, remoteWritable: remoteWritable, remoteConfig: remoteConfig, fetchRemote: fetchRemote, pushRemote: pushRemote, checkRemote: checkRemote, isAuthError: isAuthError } = __req("scripts/data/remote.js");
 const { store: store } = __req("scripts/core/store.js");
 const { player: player } = __req("scripts/core/player.js");
 
@@ -7432,6 +7191,8 @@ const listeners = new Set();
 
 let state = 'off';   // off | idle | loading | saving | saved | error
 let message = '';
+/** true when the last failure was the token itself, not the network */
+let authFailed = false;
 let sha = null;
 let timer = 0;
 let inFlight = null;
@@ -7449,11 +7210,27 @@ const emit = () => {
 const set = (next, text = '') => {
   state = next;
   message = text;
+  if (next !== 'error') authFailed = false;
   emit();
 };
 
+/** Record a failure, remembering whether it was the token's fault. */
+const fail = (err) => {
+  authFailed = isAuthError(err);
+  set('error', String((err && err.message) || err));
+};
+
 function status() {
-  return { state, message, enabled: remoteWritable(), readable: remoteReadable(), repo: remoteConfig().repo };
+  return {
+    state,
+    message,
+    /* the panel needs this to tell a dead token from a dead network: the first
+       needs a new token typed in, the second only needs patience */
+    auth: authFailed,
+    enabled: remoteWritable(),
+    readable: remoteReadable(),
+    repo: remoteConfig().repo,
+  };
 }
 
 function onSyncChange(fn) {
@@ -7509,7 +7286,7 @@ async function initSync() {
   } catch (err) {
     /* A catalogue we could not read must never stop the page from opening:
        the browser's own copy, if any, is still shown. */
-    set('error', String(err.message || err));
+    fail(err);
   }
 }
 
@@ -7646,7 +7423,7 @@ async function syncNow() {
       set('saved', result.commit ? 'Сохранено — сайт обновится через минуту' : 'Сохранено');
       return true;
     } catch (err) {
-      set('error', String(err.message || err));
+      fail(err);
       return false;
     } finally {
       inFlight = null;
@@ -7685,6 +7462,303 @@ function disableSync() {
 const isShared = () => remoteReadable();
 
 return { status, onSyncChange, initSync, hasLocalOnly, startWatch, markDirty, syncNow, testSync, disableSync, isShared };
+});
+
+__mod("scripts/ui/library.js", function () {
+/* ==========================================================================
+   ui/library.js — the track list
+   Renders rows, patches state on updates, supports drag-to-reorder and a
+   small context menu of actions per track.
+   ========================================================================== */
+
+const { el: el, icon: icon, fmtTime: fmtTime, plural: plural, on: on } = __req("scripts/core/dom.js");
+const { store: store } = __req("scripts/core/store.js");
+const { player: player } = __req("scripts/core/player.js");
+const { art: art } = __req("scripts/ui/artwork.js");
+const { GENRES: GENRES } = __req("scripts/data/tracks.js");
+const { admin: admin } = __req("scripts/data/admin.js");
+const { status: syncStatus, onSyncChange: onSyncChange } = __req("scripts/data/sync.js");
+const { toast: toast } = __req("scripts/ui/toast.js");
+
+/** the shared file's read state, as a word and as a sentence */
+const syncState = () => syncStatus().state;
+const syncMessage = () => syncStatus().message;
+
+const listEl = document.getElementById('track-list');
+const countEl = document.getElementById('lib-count');
+const headingEl = document.getElementById('lib-heading');
+const emptyEl = document.getElementById('empty-state');
+const libraryEl = document.getElementById('library');
+const rows = new Map();
+
+let dragId = null;
+
+/* ------------------------------ row markup ------------------------------ */
+function buildRow(track, index) {
+  const liked = player.isLiked(track.id);
+  const isCurrent = store.get('currentId') === track.id;
+
+  const canvas = el('canvas', { width: 88, height: 88, 'aria-hidden': 'true' });
+
+  const num = el('span', { class: 'track__num', html: isCurrent && store.get('playing') ? icon('wave', 15) : String(index + 1) });
+
+  const artBox = el('div', { class: 'track__art' },
+    canvas,
+    el('span', { class: 'art__badge' }),
+    num,
+  );
+
+  const genre = GENRES[track.genreKey]?.label ?? track.genre;
+  const meta = el('div', { class: 'track__meta' },
+    el('div', { class: 'track__title', text: track.title }),
+    el('div', { class: 'track__sub' },
+      el('span', { text: track.artist }),
+      el('i', { text: '·' }),
+      el('span', { text: track.album }),
+      el('i', { text: '·' }),
+      el('span', { text: String(track.year) }),
+    ),
+  );
+
+  const tail = el('div', { class: 'track__tail' },
+    el('span', { class: `track__badge${track.source === 'file' ? ' track__badge--local' : ''}`, text: track.source === 'file' ? 'Файл' : genre }),
+    el('span', { class: 'track__time', text: track.duration ? fmtTime(track.duration) : '—:—' }),
+  );
+
+  const likeBtn = el('button', {
+    class: `icon-btn icon-btn--sm${liked ? ' is-on' : ''}`,
+    'aria-pressed': liked ? 'true' : 'false',
+    'aria-label': liked ? 'Убрать из избранного' : 'В избранное',
+    html: icon('heart', 16),
+    onclick: (e) => {
+      e.stopPropagation();
+      const on2 = player.toggleLike(track.id);
+      likeBtn.classList.toggle('is-on', on2);
+      likeBtn.setAttribute('aria-pressed', String(on2));
+    },
+  });
+
+  const nextBtn = el('button', {
+    class: 'icon-btn icon-btn--sm',
+    'aria-label': 'Играть следующим',
+    title: 'Играть следующим',
+    html: icon('queue', 16),
+    onclick: (e) => {
+      e.stopPropagation();
+      player.playNext(track.id);
+    },
+  });
+
+  const actions = [likeBtn, nextBtn];
+  if (track.source === 'file') {
+    actions.push(el('button', {
+      class: 'icon-btn icon-btn--sm',
+      'aria-label': 'Удалить из библиотеки',
+      title: 'Удалить',
+      html: icon('trash', 16),
+      onclick: (e) => {
+        e.stopPropagation();
+        player.removeLocal(track.id);
+        toast(`«${track.title}» удалён`, 'info');
+      },
+    }));
+  }
+
+  const row = el('li', {
+    class: `track${isCurrent ? ' is-current' : ''}`,
+    dataset: { id: track.id },
+    draggable: 'true',
+    tabindex: '0',
+    role: 'button',
+    'aria-label': `${track.title}, ${track.artist}`,
+  },
+    el('span', { class: 'track__ripple' }),
+    artBox,
+    meta,
+    tail,
+    el('div', { class: 'track__act' }, ...actions),
+  );
+
+  row.style.setProperty('--i', index);
+  row.__canvas = canvas;
+  row.__num = num;
+  row.__like = likeBtn;
+  row.__index = index;
+  return row;
+}
+
+/* -------------------------------- render -------------------------------- */
+function renderLibrary() {
+  const list = player.visible();
+  const frag = document.createDocumentFragment();
+  rows.clear();
+
+  list.forEach((track, i) => {
+    const row = buildRow(track, i);
+    rows.set(track.id, row);
+    frag.append(row);
+  });
+
+  listEl.replaceChildren(frag);
+  /* paint after insertion so the canvases can read their real size */
+  for (const [id, row] of rows) art.paint(row.__canvas, player.byId(id));
+  listEl.classList.toggle('stagger', true);
+  libraryEl.dataset.layout = store.get('view');
+  countEl.textContent = plural(list.length, 'трек', 'трека', 'треков');
+  headingEl.textContent = headingFor(store.get('filter'), store.get('search'));
+  emptyEl.hidden = list.length > 0;
+  listEl.hidden = list.length === 0;
+
+  /* Three different reasons to be empty, and the third one used to look like
+     the first: a filter that matched nothing, no music at all, and no music
+     *because the shared file could not be read*. That last one is what a dead
+     network or an exhausted GitHub rate limit looks like, and it was reported
+     as "0 треков" with nothing else - which reads as data loss, and sends you
+     looking for a problem you do not have. So say which one it is. */
+  const filtered = !!(store.get('search') || store.get('filter') !== 'all');
+  const shelfEmpty = player.library.length === 0;
+  const unreadable = shelfEmpty && syncState() === 'error';
+  const text = document.getElementById('empty-text');
+  const hint = document.getElementById('empty-hint');
+  const reset = document.getElementById('btn-reset');
+  if (text) {
+    if (unreadable) text.textContent = 'Общий каталог не прочитан';
+    else text.textContent = shelfEmpty ? 'Музыки пока нет' : 'Ничего не найдено';
+  }
+  if (hint) {
+    hint.hidden = !shelfEmpty;
+    if (unreadable) hint.textContent = syncMessage();
+  }
+  if (reset) reset.hidden = !filtered;
+  /* offering "add music" when the shelf only looks empty would invite someone
+     to re-add tracks that are already in the repository */
+  document.getElementById('btn-empty-admin').hidden = !shelfEmpty || unreadable;
+  document.getElementById('btn-empty-upload').hidden = !shelfEmpty || unreadable;
+
+  document.getElementById('btn-clear-filters').hidden = !filtered;
+}
+
+function headingFor(filter, search) {
+  if (search) return `Поиск: «${search}»`;
+  if (typeof filter === 'string' && filter.startsWith('pl:')) {
+    return admin.playlist(filter.slice(3))?.name || 'Плейлист';
+  }
+  return {
+    all: 'Все треки',
+    liked: 'Избранное',
+    recent: 'Недавнее',
+    local: 'Загруженное',
+  }[filter] || GENRES[filter]?.label || 'Все треки';
+}
+
+/**
+ * The empty shelf has to be able to explain itself, which means it has to be
+ * redrawn when the answer changes: the file may fail to read after the shelf
+ * has already rendered, and the note should appear on its own.
+ */
+onSyncChange(() => {
+  const shelf = document.getElementById('empty-state');
+  if (shelf && !shelf.hidden) renderLibrary();
+});
+
+/** Patch the rows without a full re-render (current track, likes) */
+function syncLibrary() {
+  const cur = store.get('currentId');
+  const playing = store.get('playing');
+  for (const [id, row] of rows) {
+    const isCurrent = id === cur;
+    row.classList.toggle('is-current', isCurrent);
+    row.__num.innerHTML = isCurrent
+      ? (playing ? icon('wave', 15) : icon('pause', 13))
+      : String(row.__index + 1);
+    const liked = player.isLiked(id);
+    row.__like.classList.toggle('is-on', liked);
+    row.__like.setAttribute('aria-pressed', String(liked));
+  }
+}
+
+/* ------------------------------ interaction ----------------------------- */
+on(listEl, 'click', (e) => {
+  const row = e.target.closest('.track');
+  if (!row) return;
+  const id = row.dataset.id;
+  if (e.target.closest('button')) return;
+  player.play(id);
+});
+
+on(listEl, 'keydown', (e) => {
+  const row = e.target.closest('.track');
+  if (!row) return;
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    player.play(row.dataset.id);
+  }
+  if (e.key === 'ArrowDown' && row.nextElementSibling) {
+    e.preventDefault();
+    row.nextElementSibling.focus();
+  }
+  if (e.key === 'ArrowUp' && row.previousElementSibling) {
+    e.preventDefault();
+    row.previousElementSibling.focus();
+  }
+});
+
+/* pointer ripple, positioned from the pointer */
+on(listEl, 'pointerdown', (e) => {
+  const row = e.target.closest('.track');
+  if (!row) return;
+  const rect = row.getBoundingClientRect();
+  row.style.setProperty('--rx', `${e.clientX - rect.left}px`);
+  row.style.setProperty('--ry', `${e.clientY - rect.top}px`);
+});
+
+/* ---------------------------- drag to reorder --------------------------- */
+on(listEl, 'dragstart', (e) => {
+  const row = e.target.closest('.track');
+  if (!row) return;
+  dragId = row.dataset.id;
+  row.classList.add('is-dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragId);
+});
+
+on(listEl, 'dragend', () => {
+  dragId = null;
+  for (const row of rows.values()) row.classList.remove('is-dragging', 'is-over');
+});
+
+on(listEl, 'dragover', (e) => {
+  if (!dragId) return;
+  e.preventDefault();
+  const row = e.target.closest('.track');
+  for (const r of rows.values()) r.classList.toggle('is-over', r === row && r.dataset.id !== dragId);
+});
+
+on(listEl, 'drop', (e) => {
+  if (!dragId) return;
+  e.preventDefault();
+  const row = e.target.closest('.track');
+  const targetId = row?.dataset.id;
+  if (!targetId || targetId === dragId) return;
+
+  const order = [...(store.get('order') || [])];
+  const from = order.indexOf(dragId);
+  const to = order.indexOf(targetId);
+  if (from < 0 || to < 0) return;
+  order.splice(to, 0, order.splice(from, 1)[0]);
+  store.set({ order });
+  renderLibrary();
+});
+
+/* keep art in sync with the viewport (lazy canvases start blank at 0×0) */
+on(window, 'resize', () => {
+  for (const [id, row] of rows) {
+    const track = player.byId(id);
+    if (track) art.paint(row.__canvas, track);
+  }
+});
+
+return { renderLibrary, syncLibrary };
 });
 
 __mod("scripts/ui/sidebar.js", function () {
@@ -9794,6 +9868,7 @@ function showPanel() {
   renderMusic();
   renderPlaylists();
   renderSync();
+  renderTokenBanner();
   /* the add form may have been asked for from the empty shelf */
   if (pendingExpand) {
     pendingExpand = false;
@@ -9825,6 +9900,50 @@ const renderSync = () => {
   const host = qs('#adm-sync');
   if (host) host.replaceChildren(buildSync());
 };
+
+/**
+ * A token that GitHub has stopped accepting.
+ *
+ * Worth shouting about, because nothing else on the page looks broken: the
+ * panel opens, the shelf is there, and only the save quietly does nothing.
+ * That is exactly what a revoked token looks like, and the owner's next step -
+ * enter the new one - is not guessable from a status line in a corner.
+ */
+let tokenRejected = false;
+
+function renderTokenBanner() {
+  const host = qs('#adm-token-banner');
+  if (!host) return;
+  if (!tokenRejected) {
+    host.hidden = true;
+    host.replaceChildren();
+    return;
+  }
+  host.hidden = false;
+  host.replaceChildren(el('div', { class: 'adm-add adm-warn' }, [
+    el('h3', { text: 'Токен больше не работает' }),
+    el('p', { text: 'GitHub его отклонил — значит токен отозван или истёк. Новый токен работает, старый нет: отзыв делается только на стороне GitHub, само создание нового токена ничего не отменяет.' }),
+    el('div', { class: 'adm-add__row' }, [
+      el('button', { class: 'primary-btn', type: 'button', text: 'Ввести новый токен', onclick: () => {
+        disableSync();
+        admin.logout();
+        showGate();
+      } }),
+    ]),
+  ]));
+}
+
+/**
+ * Watch the write state while the panel is open, so a token that has stopped
+ * working says so instead of leaving the save button looking inert.
+ */
+function watchTokenHealth() {
+  onSyncChange((s) => {
+    if (s.state !== 'error' || !s.auth) return;
+    tokenRejected = true;
+    renderTokenBanner();
+  });
+}
 
 function switchTab(name) {
   for (const btn of qsa('#adm-tabs button')) {
@@ -9896,6 +10015,7 @@ function build() {
             class: 'adm-tab', type: 'button', role: 'tab', 'data-tab': key,
             onclick: () => switchTab(key), text: label,
           }))),
+        el('div', { id: 'adm-token-banner', hidden: true }),
         el('div', { class: 'adm-sections', id: 'adm-sections' }, [
           el('section', { 'data-tab': 'site' }, [el('div', { class: 'adm-section__body', id: 'adm-site' })]),
           el('section', { 'data-tab': 'music', hidden: true }, [el('div', { id: 'adm-music' })]),
@@ -9924,6 +10044,7 @@ function initAdmin() {
   applySite();
   /* keep the badge honest if the session is already open */
   setBadge(admin.authed ? 'on' : 'off');
+  watchTokenHealth();
 }
 
 

@@ -12,7 +12,7 @@
    ========================================================================== */
 
 import { admin } from './admin.js';
-import { remoteReadable, remoteWritable, remoteConfig, fetchRemote, pushRemote, checkRemote } from './remote.js';
+import { remoteReadable, remoteWritable, remoteConfig, fetchRemote, pushRemote, checkRemote, isAuthError } from './remote.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
 
@@ -20,6 +20,8 @@ const listeners = new Set();
 
 let state = 'off';   // off | idle | loading | saving | saved | error
 let message = '';
+/** true when the last failure was the token itself, not the network */
+let authFailed = false;
 let sha = null;
 let timer = 0;
 let inFlight = null;
@@ -37,11 +39,27 @@ const emit = () => {
 const set = (next, text = '') => {
   state = next;
   message = text;
+  if (next !== 'error') authFailed = false;
   emit();
 };
 
+/** Record a failure, remembering whether it was the token's fault. */
+const fail = (err) => {
+  authFailed = isAuthError(err);
+  set('error', String((err && err.message) || err));
+};
+
 export function status() {
-  return { state, message, enabled: remoteWritable(), readable: remoteReadable(), repo: remoteConfig().repo };
+  return {
+    state,
+    message,
+    /* the panel needs this to tell a dead token from a dead network: the first
+       needs a new token typed in, the second only needs patience */
+    auth: authFailed,
+    enabled: remoteWritable(),
+    readable: remoteReadable(),
+    repo: remoteConfig().repo,
+  };
 }
 
 export function onSyncChange(fn) {
@@ -97,7 +115,7 @@ export async function initSync() {
   } catch (err) {
     /* A catalogue we could not read must never stop the page from opening:
        the browser's own copy, if any, is still shown. */
-    set('error', String(err.message || err));
+    fail(err);
   }
 }
 
@@ -234,7 +252,7 @@ export async function syncNow() {
       set('saved', result.commit ? 'Сохранено — сайт обновится через минуту' : 'Сохранено');
       return true;
     } catch (err) {
-      set('error', String(err.message || err));
+      fail(err);
       return false;
     } finally {
       inFlight = null;
