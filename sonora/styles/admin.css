@@ -329,6 +329,41 @@
 }
 .adm-tag--own { color: var(--accent-ink); border-color: color-mix(in oklab, var(--accent-a) 50%, transparent); }
 .adm-tag--url { color: #7cc7ff; border-color: color-mix(in oklab, #7cc7ff 40%, transparent); }
+.adm-tag--dirty {
+  color: #ffc46b;
+  border-color: color-mix(in oklab, #ffc46b 45%, transparent);
+  background: color-mix(in oklab, #ffc46b 12%, transparent);
+}
+
+/* The filled action of a panel. It was used in the markup from the start but
+   never had a rule, so every "add", "create" and "sign in" button fell back to
+   the browser default and looked like a stray control. */
+.primary-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--accent-ink);
+  background: var(--accent-a);
+  cursor: pointer;
+  transition: filter var(--d2) var(--ease), opacity var(--d2) var(--ease);
+}
+.primary-btn:hover:not(:disabled) { filter: brightness(1.12); }
+.primary-btn:active:not(:disabled) { filter: brightness(0.96); }
+.primary-btn:focus-visible {
+  outline: 2px solid var(--accent-a);
+  outline-offset: 2px;
+}
+.primary-btn--sm { padding: 6px 14px; font-size: 0.85rem; }
+.primary-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  filter: none;
+}
 
 .adm-track__actions {
   display: flex;

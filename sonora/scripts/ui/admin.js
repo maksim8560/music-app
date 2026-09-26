@@ -181,29 +181,33 @@ function buildSite() {
   const site = admin.site;
   const accents = [['', 'Как в плеере'], ...['aurora', 'Aurora'], ['ember', 'Ember'], ['mint', 'Mint'], ['mono', 'Mono'].map((a) => [a, a])];
 
-  return el('div', { class: 'adm-grid' }, [
-    field('Имя страницы', input(site.name, (v) => {
-      admin.updateSite({ name: v });
-      applySite();
-    }, { maxlength: '40' }), 'Показывается в шапке и во вкладке браузера.'),
-    field('Подпись', input(site.tagline, (v) => {
-      admin.updateSite({ tagline: v });
-      applySite();
-    }, { maxlength: '40' }), 'Например: Glass Edition.'),
-    field('Описание', input(site.description, (v) => {
-      admin.updateSite({ description: v });
-      applySite();
-    }, { maxlength: '180' }),
+  /* Same contract as the track editor: the fields hold a draft and «Сохранить»
+     commits it, so a half-typed name never becomes the title of the site. */
+  const draft = {};
+  const saveBtn = el('button', { class: 'primary-btn', type: 'button', text: 'Сохранить', disabled: true });
+  const refresh = () => { saveBtn.disabled = !Object.keys(draft).length; };
+  const set = (k, v) => { draft[k] = v; refresh(); };
+  saveBtn.addEventListener('click', () => {
+    if (!Object.keys(draft).length) return;
+    admin.updateSite({ ...draft });
+    for (const k of Object.keys(draft)) delete draft[k];
+    refresh();
+    applySite();
+    toast('Настройки сайта сохранены', 'ok', 2500);
+  });
+
+  const grid = el('div', { class: 'adm-grid' }, [
+    field('Имя страницы', input(site.name, (v) => set('name', v), { maxlength: '40' }), 'Показывается в шапке и во вкладке браузера.'),
+    field('Подпись', input(site.tagline, (v) => set('tagline', v), { maxlength: '40' }), 'Например: Glass Edition.'),
+    field('Описание', input(site.description, (v) => set('description', v), { maxlength: '180' }),
       'Попадает в meta description — для поисковиков и предпросмотра ссылки.'),
-    field('Акцент', select(site.accent, accents, (v) => {
-      admin.updateSite({ accent: v });
-      if (v) store.patchSettings({ accent: v });
-      applyTheme();
-    }), 'Пусто — оставить акцент, выбранный в настройках плеера.'),
-    field('Фоновая картинка (URL)', input(site.background, (v) => {
-      admin.updateSite({ background: v });
-      applySite();
-    }, { placeholder: 'https://…/photo.jpg' }), 'Ссылка на изображение. Показывается затемнённым поверх живого фона.'),
+    field('Акцент', select(site.accent, accents, (v) => set('accent', v)), 'Пусто — оставить акцент, выбранный в настройках плеера.'),
+    field('Фоновая картинка (URL)', input(site.background, (v) => set('background', v), { placeholder: 'https://…/photo.jpg' }), 'Ссылка на изображение. Показывается затемнённым поверх живого фона.'),
+  ]);
+
+  return el('div', { class: 'adm-stack' }, [
+    grid,
+    el('div', { class: 'adm-add__row' }, [saveBtn]),
   ]);
 }
 
@@ -219,6 +223,18 @@ function trackRow(track) {
   const isStream = track.source === 'stream';
   const isUrl = track.source === 'url' || isStream;
 
+  /**
+   * Edits are collected here and committed by «Сохранить».
+   *
+   * Writing through on every keystroke meant a half-typed word was already
+   * saved, and every letter cost a store write, a reconcile and a library
+   * repaint. Now the row owns a draft: nothing reaches the player or
+   * localStorage until the button is pressed, and «Сбросить» throws the draft
+   * away instead of half-applying it.
+   */
+  const draft = {};
+  const dirty = () => Object.keys(draft).length > 0;
+
   const titleEl = el('b', { text: track.title });
   const idEl = el('small', { text: `${track.artist} · ${track.id}` });
   const tagsEl = el('div', { class: 'adm-track__tags' });
@@ -228,56 +244,77 @@ function trackRow(track) {
     if (isStream) tagsEl.append(el('span', { class: 'adm-tag adm-tag--url', text: 'радио' }));
     else if (isUrl) tagsEl.append(el('span', { class: 'adm-tag adm-tag--url', text: 'ссылка' }));
     if (admin.isEdited(track.id)) tagsEl.append(el('span', { class: 'adm-tag', text: 'изменён' }));
+    if (dirty()) tagsEl.append(el('span', { class: 'adm-tag adm-tag--dirty', text: 'не сохранено' }));
   };
   paintTags();
+
+  const saveBtn = el('button', { class: 'primary-btn primary-btn--sm', type: 'button', text: 'Сохранить', disabled: true });
+  const refreshSave = () => {
+    saveBtn.disabled = !dirty();
+    paintTags();
+  };
+  const set = (key, value) => {
+    draft[key] = value;
+    refreshSave();
+  };
+
+  saveBtn.addEventListener('click', () => {
+    if (!dirty()) return;
+    admin.updateTrack(track.id, { ...draft });
+    for (const k of Object.keys(draft)) delete draft[k];
+    titleEl.textContent = track.title;
+    idEl.textContent = `${track.artist} · ${track.id}`;
+    fillCover();
+    refreshSave();
+    catalogueChanged(`«${track.title}» сохранён`);
+  });
+  saveBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveBtn.click();
+  });
+
+  const discard = () => {
+    if (!dirty()) {
+      admin.resetTrack(track.id);
+      renderMusic();
+      catalogueChanged('Трек возвращён к исходному');
+      return;
+    }
+    for (const k of Object.keys(draft)) delete draft[k];
+    renderMusic();
+    toast('Правки отменены', 'info', 2000);
+  };
 
   const head = el('div', { class: 'adm-track__head' }, [
     el('span', { class: `adm-dot adm-dot--${track.genreKey || 'local'}` }),
     el('div', { class: 'adm-track__id' }, [titleEl, idEl]),
     tagsEl,
-    button('Сбросить', () => {
-      admin.resetTrack(track.id);
-      renderMusic();
-      catalogueChanged('Трек возвращён к исходному');
-    }, 'ghost-btn ghost-btn--sm'),
+    button('Сбросить', discard, 'ghost-btn ghost-btn--sm'),
   ]);
 
-  /**
-   * Persist an edit and refresh only what the row itself shows.
-   *
-   * This used to rebuild the whole music section on every keystroke, which
-   * destroyed the very field being typed into — the caret jumped out after the
-   * first character and the field had to be clicked again for every letter. The
-   * row is cheap to update in place, and the player is told separately.
-   */
-  const apply = (patch) => {
-    admin.updateTrack(track.id, patch);
-    if ('title' in patch) titleEl.textContent = track.title;
-    if ('artist' in patch) idEl.textContent = `${track.artist} · ${track.id}`;
-    paintTags();
-    catalogueChanged();
-  };
-
   const controls = [
-    field('Название', input(track.title, (v) => apply({ title: v }), { maxlength: '60' })),
-    field('Исполнитель', input(track.artist, (v) => apply({ artist: v }), { maxlength: '60' })),
-    field('Альбом', input(track.album, (v) => apply({ album: v }), { maxlength: '60' })),
-    field('Год', numberInput(track.year, (v) => apply({ year: Number(v) || 0 }), { min: '1900', max: '2999' })),
+    field('Название', input(track.title, (v) => set('title', v), { maxlength: '60' })),
+    field('Исполнитель', input(track.artist, (v) => set('artist', v), { maxlength: '60' })),
+    field('Альбом', input(track.album, (v) => set('album', v), { maxlength: '60' })),
+    field('Год', numberInput(track.year, (v) => set('year', Number(v) || 0), { min: '1900', max: '2999' })),
     field('Жанр', select(track.genreKey, Object.entries(GENRES).map(([k, g]) => [k, g.label]), (v) => {
-      apply({ genreKey: v, genre: GENRES[v]?.label || v });
+      draft.genreKey = v;
+      draft.genre = GENRES[v]?.label || v;
+      refreshSave();
     })),
   ];
 
   const music = [
-    field('Длительность, с', numberInput(track.duration, (v) => apply({ duration: Number(v) || 0 }), { min: '20', max: '3600' })),
-    field('Темп, BPM', numberInput(track.bpm, (v) => apply({ bpm: Number(v) || 0 }), { min: '40', max: '200' })),
-    field('Тоника (MIDI)', numberInput(track.root, (v) => apply({ root: Number(v) || 0 }), { min: '24', max: '84' })),
-    field('Гамма', select(track.scale, Object.entries(SCALE_LABELS), (v) => apply({ scale: v }))),
+    field('Длительность, с', numberInput(track.duration, (v) => set('duration', Number(v) || 0), { min: '20', max: '3600' })),
+    field('Темп, BPM', numberInput(track.bpm, (v) => set('bpm', Number(v) || 0), { min: '40', max: '200' })),
+    field('Тоника (MIDI)', numberInput(track.root, (v) => set('root', Number(v) || 0), { min: '24', max: '84' })),
+    field('Гамма', select(track.scale, Object.entries(SCALE_LABELS), (v) => set('scale', v))),
   ];
 
   const actions = el('div', { class: 'adm-track__actions' }, [
+    saveBtn,
     button('▶', () => player.play(track.id), 'ghost-btn ghost-btn--sm'),
-    isUrl || isStream ? null : button('Перегенерировать', () => {      admin.reseed(track.id);
+    isUrl || isStream ? null : button('Перегенерировать', () => {
+      admin.reseed(track.id);
       renderMusic();
       catalogueChanged('Новый вариант — та же настройка, другая музыка');
     }, 'ghost-btn ghost-btn--sm'),
@@ -287,6 +324,7 @@ function trackRow(track) {
       catalogueChanged(shown ? 'Трек вернулся в список' : 'Трек скрыт из плеера');
     }, 'ghost-btn ghost-btn--sm'),
     custom ? button('Удалить', () => {
+      if (dirty() && !confirm('Есть несохранённые правки — они пропадут. Удалить трек?')) return;
       admin.removeCustom(track.id);
       renderMusic();
       catalogueChanged('Трек удалён');
@@ -294,12 +332,14 @@ function trackRow(track) {
   ]);
 
   /* the cover the player will actually show: the uploaded one, or the
-     procedural art that gets drawn from the id */
+     procedural art that gets drawn from the id. The preview follows the field
+     while typing — it is feedback, not a save. */
   const coverBox = el('div', { class: 'adm-cover' }, []);
-  const fillCover = () => {
+  const fillCover = (override) => {
+    const url = override !== undefined ? override : track.coverUrl;
     coverBox.replaceChildren();
-    if (track.coverUrl) {
-      const img = el('img', { src: track.coverUrl, alt: '', loading: 'lazy' });
+    if (url) {
+      const img = el('img', { src: url, alt: '', loading: 'lazy' });
       img.addEventListener('error', () => coverBox.replaceChildren(
         el('span', { text: 'не загрузилась' }),
       ));
@@ -318,14 +358,12 @@ function trackRow(track) {
   const coverField = el('div', { class: 'adm-grid adm-grid--split' }, [
     field('Описание', el('textarea', {
       rows: '3', maxlength: '400',
-      oninput: (e) => { admin.updateTrack(track.id, { blurb: e.target.value }); },
+      oninput: (e) => set('blurb', e.target.value),
     }), 'Показывается в списке и в карточке трека.'),
     field('Ссылка на обложку', input(track.coverUrl, (v) => {
-      admin.updateTrack(track.id, { coverUrl: v });
-      track.coverUrl = /^https?:\/\/\S+$/i.test(v.trim()) || /^data:image\//i.test(v.trim()) ? v.trim() : '';
-      fillCover();
-      art.preload(track);
-      catalogueChanged();
+      set('coverUrl', v);
+      const ok = /^https?:\/\/\S+$/i.test(v.trim()) || /^data:image\//i.test(v.trim());
+      fillCover(ok ? v.trim() : '');
     }, { placeholder: 'https://…/cover.jpg' })),
   ]);
   coverField.querySelector('textarea').value = track.blurb || '';
