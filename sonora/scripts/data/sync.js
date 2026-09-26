@@ -12,7 +12,7 @@
    ========================================================================== */
 
 import { admin } from './admin.js';
-import { remoteReadable, remoteWritable, remoteConfig, fetchRemote, pushRemote, checkRemote, isAuthError } from './remote.js';
+import { remoteReadable, remoteWritable, remoteConfig, fetchRemote, pushRemote, checkRemote, isAuthError, forgetToken } from './remote.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
 
@@ -177,6 +177,17 @@ async function poll() {
        not this event's business - it belongs to the next full load */
     if (onRemoteChange) onRemoteChange({ added: after - before, total: after });
   } catch (err) {
+    /* A stored token that GitHub refuses means the owner revoked it, or it
+       expired. Drop it here rather than waiting for someone to click the admin
+       button: the point of revoking is that the thing stops working, and a
+       dead secret left sitting in a browser is only dead because nothing
+       happened to try it. Reading carries on regardless - a public file needs
+       no token - so the music does not stop, only the writing does. */
+    if (isAuthError(err)) {
+      forgetToken();
+      set('readonly', 'Токен отозван или истёк — он удалён из этого браузера. Каталог читается, запись из него больше невозможна.');
+      return;
+    }
     /* GitHub allows an anonymous caller 60 reads an hour, per IP, and that
        budget is shared by everyone behind the same address. Once it is gone
        every check fails until the hour rolls over, so asking again every
