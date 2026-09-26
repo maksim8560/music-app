@@ -16,8 +16,8 @@
       "artist": "Retro",
       "album": "Retro Music",
       "year": 2026,
-      "genre": "Радио",
-      "genreKey": "local",
+      "genre": "Эмбиент",
+      "genreKey": "ambient",
       "duration": 0,
       "colors": [
         "#ff7a6b",
@@ -39,6 +39,6 @@
     }
   ],
   "genres": [],
-  "updatedAt": 1790460575483,
-  "exportedAt": "2026-09-26T22:09:40.388Z"
+  "updatedAt": 1790460607811,
+  "exportedAt": "2026-09-26T22:10:09.013Z"
 }
