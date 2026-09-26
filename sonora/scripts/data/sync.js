@@ -128,10 +128,13 @@ export function hasLocalOnly() {
 const WATCH_FAST = 60_000;
 /** without one every check is a full read, and the budget is 60 an hour */
 const WATCH_SLOW = 5 * 60_000;
+/** the ceiling on backing off, reached after a few fruitless attempts */
+const WATCH_MAX_BACKOFF = 15 * 60_000;
 
 let watchTimer = 0;
 let watchBusy = false;
 let watching = false;
+let watchFails = 0;
 let onRemoteChange = null;
 let isPanelBusy = null;
 
@@ -142,6 +145,7 @@ async function poll() {
   watchBusy = true;
   try {
     const res = await fetchRemote({ etag: watchEtag });
+    watchFails = 0;
     if (res.notModified) return;
     watchEtag = res.etag;
     if (!res.doc || res.sha === sha) return;
@@ -155,12 +159,24 @@ async function poll() {
        not this event's business - it belongs to the next full load */
     if (onRemoteChange) onRemoteChange({ added: after - before, total: after });
   } catch (err) {
-    /* a failed check is not news: say it once in the console and try again
-       on the next tick rather than interrupting whoever is listening */
-    console.warn('[sync] не удалось проверить файл каталога', err);
+    /* GitHub allows an anonymous caller 60 reads an hour, per IP, and that
+       budget is shared by everyone behind the same address. Once it is gone
+       every check fails until the hour rolls over, so asking again every
+       minute accomplishes nothing but traffic. Back off instead, and let the
+       next successful check - or the tab coming back to the front - pick it
+       up. */
+    watchFails++;
+    if (watchFails === 1) console.warn('[sync] не удалось проверить файл каталога', err);
   } finally {
     watchBusy = false;
   }
+}
+
+/** how long to wait before the next check, given how the last ones went */
+function watchDelay() {
+  const base = watchEtag ? WATCH_FAST : WATCH_SLOW;
+  if (!watchFails) return base;
+  return Math.min(base * 2 ** watchFails, WATCH_MAX_BACKOFF);
 }
 
 /**
@@ -178,14 +194,17 @@ export function startWatch({ busy, onChange } = {}) {
     watchTimer = setTimeout(async () => {
       await poll();
       tick();
-    }, watchEtag ? WATCH_FAST : WATCH_SLOW);
+    }, watchDelay());
   };
   tick();
 
   /* coming back to the tab is the moment staleness is visible, so ask at once
      instead of making someone wait out the rest of the interval */
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') poll();
+    if (document.visibilityState !== 'visible') return;
+    /* a rate-limited hour is not fixed by refreshing, so ask at once only
+       while the last check actually got an answer */
+    if (!watchFails) poll();
   });
   window.addEventListener('online', () => poll());
 }

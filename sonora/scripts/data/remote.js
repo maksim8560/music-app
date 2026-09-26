@@ -146,6 +146,20 @@ export async function fetchRemote({ etag = '' } = {}) {
   const res = await request(url, { headers: h, cache: 'no-store' }, 'Чтение каталога');
   if (res.status === 304) return { doc: null, sha: null, etag, notModified: true };
   if (res.status === 404) return { doc: null, sha: null, etag: '', notModified: false };
+  /* 403 means two very different things, and telling a reader to paste a token
+     when the real problem is an exhausted hourly budget wastes their time.
+     GitHub says which one it is in the remaining-requests header. */
+  if (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0') {
+    const reset = Number(res.headers.get('x-ratelimit-reset') || 0) * 1000;
+    const mins = reset ? Math.max(1, Math.ceil((reset - Date.now()) / 60000)) : 0;
+    /* an anonymous caller gets 60 an hour for the whole address, so this bites
+       a reader on shared wifi; a token raises it to 5000 and is worth saying so
+       only when one is actually in use */
+    const hint = cfg.token ? '' : ' Токен в панели поднимает лимит и снимает эту проблему.';
+    throw new Error(mins
+      ? `GitHub временно не отдаёт каталог: закончились запросы на час, лимит обновится через ~${mins} мин.${hint}`
+      : `GitHub временно не отдаёт каталог: закончились запросы на час.${hint}`);
+  }
   if (res.status === 401 || res.status === 403) {
     throw new Error('GitHub не пустил. Если репозиторий приватный — вставьте токен, если публичный — проверьте имя и ветку.');
   }
