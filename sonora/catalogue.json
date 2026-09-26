@@ -14,7 +14,7 @@
       "id": "radio-1",
       "title": "Радио Ретро Хит",
       "artist": "Retro",
-      "album": "Retro Music",
+      "album": "Музыка для души",
       "year": 2026,
       "genre": "Эмбиент",
       "genreKey": "ambient",
@@ -39,6 +39,6 @@
     }
   ],
   "genres": [],
-  "updatedAt": 1790460607811,
-  "exportedAt": "2026-09-26T22:10:09.013Z"
+  "updatedAt": 1790460615275,
+  "exportedAt": "2026-09-26T22:10:16.477Z"
 }
