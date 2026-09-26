@@ -68,8 +68,67 @@ const DEFAULTS = () => ({
   custom: [],
   /* the admin's own playlists: [{ id, name, trackIds }] */
   playlists: [],
+  /* the admin's own genres, on top of the built-in ones: [{ key, label, color }] */
+  genres: [],
   updatedAt: 0,
 });
+
+/** Colours a new genre can be given, so the rail stays readable. */
+export const GENRE_COLORS = [
+  '#7c8cff', '#63f5d2', '#ffb26b', '#d79bff', '#ff6b81', '#6bd3ff',
+  '#a8e06a', '#f5a3d0', '#ffd166', '#8de0c0', '#c4a7ff', '#ff9f7a',
+];
+
+/** The built-in genres, kept always available and used as the seed. */
+const BUILTIN_GENRES = Object.entries(GENRES).map(([key, g], i) => ({
+  key,
+  label: g.label,
+  color: GENRE_COLORS[i % GENRE_COLORS.length],
+  builtin: true,
+}));
+
+/**
+ * A key has to survive a `data-filter`, a CSS class and a query string, so it
+ * stays latin and lowercase even when the name is written in Cyrillic.
+ */
+const TRANSLIT = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
+  и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+  с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch',
+  ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+};
+
+function slugify(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[а-яё]/g, (ch) => TRANSLIT[ch] ?? ch)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+}
+
+/**
+ * The genres the admin made. Built-in ones are never stored - they are always
+ * there - so this list only holds what was added on top, and renaming a
+ * built-in works by shadowing its label.
+ */
+function normaliseGenres(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  const keys = new Set();
+  for (const g of list) {
+    if (!g || typeof g !== 'object') continue;
+    const key = String(g.key || '').trim().toLowerCase();
+    if (!key || keys.has(key)) continue;
+    keys.add(key);
+    out.push({
+      key,
+      label: String(g.label || g.key).slice(0, 40),
+      color: /^#[0-9a-f]{6}$/i.test(g.color || '') ? g.color : GENRE_COLORS[out.length % GENRE_COLORS.length],
+    });
+  }
+  return out;
+}
 
 /** Older saves have no playlists; keep the shape honest on the way in. */
 function normalisePlaylists(list) {
@@ -101,6 +160,7 @@ function read() {
       hidden: Array.isArray(saved.hidden) ? saved.hidden : [],
       custom: Array.isArray(saved.custom) ? saved.custom : [],
       playlists: normalisePlaylists(saved.playlists),
+      genres: normaliseGenres(saved.genres),
     };
   } catch {
     return DEFAULTS();
@@ -263,7 +323,8 @@ class Admin {
     for (const key of EDITABLE) {
       if (key in patch && patch[key] !== undefined && patch[key] !== null) clean[key] = patch[key];
     }
-    if (clean.genreKey && !GENRES[clean.genreKey]) delete clean.genreKey;
+    /* the admin's own genres count, so a track may be filed under one of them */
+    if (clean.genreKey && !this.genre(clean.genreKey)) delete clean.genreKey;
     if ('coverUrl' in clean) clean.coverUrl = safeImage(clean.coverUrl);
     const custom = this.#state.custom.find((t) => t.id === id);
     if (custom) {
@@ -313,14 +374,14 @@ class Admin {
   /** A hand-built generative track, modelled on the shipped ones. */
   addGenerative(partial = {}) {
     const id = this.#nextId('admin');
-    const genreKey = GENRES[partial.genreKey] ? partial.genreKey : 'ambient';
+    const genreKey = this.genre(partial.genreKey) ? partial.genreKey : 'ambient';
     const track = {
       id,
       title: partial.title?.trim() || 'Без названия',
       artist: partial.artist?.trim() || 'Неизвестный исполнитель',
       album: partial.album?.trim() || 'Своя подборка',
       year: Number(partial.year) || new Date().getFullYear(),
-      genre: partial.genre?.trim() || GENRES[genreKey].label,
+      genre: partial.genre?.trim() || this.genreLabel(genreKey),
       genreKey,
       duration: clampNum(partial.duration, 60, 3600, 210),
       bpm: clampNum(partial.bpm, 40, 200, 84),
@@ -357,8 +418,10 @@ class Admin {
       artist: artist?.trim() || (live ? 'Радио' : 'По ссылке'),
       album: album?.trim() || (live ? 'Эфир' : 'Ссылки'),
       year: new Date().getFullYear(),
-      genre: live ? 'Радио' : (GENRES[genreKey]?.label || GENRES.local.label),
-      genreKey: live ? 'local' : (GENRES[genreKey] ? genreKey : 'local'),
+      /* an unknown key must not leak into the label: a track called "дарквейв"
+         under the raw key reads like a bug, not like a genre */
+      genre: live ? 'Радио' : (this.genre(genreKey) ? this.genreLabel(genreKey) : this.genreLabel('local')),
+      genreKey: live ? 'local' : (this.genre(genreKey) ? genreKey : 'local'),
       /* 0 until a file is fetched and decoded — the clock fills in then. A
          stream has no length at all, and 0 is how the transport reads that. */
       duration: 0,
@@ -451,6 +514,96 @@ class Admin {
     return this.#state.playlists;
   }
 
+  /* ------------------------------- genres -------------------------------- */
+
+  /**
+   * Every genre available to a track: the built-in five, plus whatever the
+   * admin added, plus any label the admin gave a built-in key. Renaming a
+   * built-in shadows its label rather than forking it, so old tracks keep
+   * working and nothing is duplicated in the dropdown.
+   */
+  genres() {
+    const out = BUILTIN_GENRES.map((g) => ({ ...g }));
+    for (const g of this.#state.genres) {
+      const found = out.find((x) => x.key === g.key);
+      if (found) Object.assign(found, { label: g.label, color: g.color, custom: true, builtin: false });
+      else out.push({ ...g, custom: true });
+    }
+    return out;
+  }
+
+  genre(key) {
+    return this.genres().find((g) => g.key === key) || null;
+  }
+
+  genreLabel(key) {
+    return this.genre(key)?.label || key || '';
+  }
+
+  genreColor(key) {
+    return this.genre(key)?.color || GENRE_COLORS[0];
+  }
+
+  addGenre(label, color) {
+    const clean = (label || '').trim();
+    if (!clean) throw new Error('Дайте жанру название');
+    /* by name, not by key: "Дарквейв" and "дарквейв" are the same genre, and a
+       transliterated key would happily make them look like two */
+    const clash = this.genres().find((g) => g.label.trim().toLowerCase() === clean.toLowerCase());
+    if (clash) throw new Error(`Жанр «${clash.label}» уже есть`);
+    const taken = new Set(this.genres().map((g) => g.key));
+    let key = slugify(clean);
+    if (!key) key = `genre-${this.#state.genres.length + 1}`;
+    if (taken.has(key)) {
+      let n = 2;
+      while (taken.has(`${key}-${n}`)) n++;
+      key = `${key}-${n}`;
+    }
+    const genre = {
+      key,
+      label: clean.slice(0, 40),
+      color: /^#[0-9a-f]{6}$/i.test(color || '') ? color : GENRE_COLORS[this.#state.genres.length % GENRE_COLORS.length],
+    };
+    this.#state.genres.push(genre);
+    write(this.#state);
+    return genre;
+  }
+
+  renameGenre(key, label, color) {
+    const clean = (label || '').trim();
+    if (!clean) throw new Error('Дайте жанру название');
+    const mine = this.#state.genres.find((g) => g.key === key);
+    if (mine) {
+      mine.label = clean.slice(0, 40);
+      if (/^#[0-9a-f]{6}$/i.test(color || '')) mine.color = color;
+    } else if (BUILTIN_GENRES.some((g) => g.key === key)) {
+      /* a built-in, shadowed so the new name follows it everywhere */
+      this.#state.genres.push({
+        key,
+        label: clean.slice(0, 40),
+        color: /^#[0-9a-f]{6}$/i.test(color || '') ? color : this.genreColor(key),
+      });
+    } else {
+      return null;
+    }
+    /* tracks that only carried the key must learn the new name */
+    for (const t of this.#state.custom) {
+      if (t.genreKey === key) t.genre = clean.slice(0, 40);
+    }
+    write(this.#state);
+    return this.genre(key);
+  }
+
+  /**
+   * Remove a genre. Tracks keep playing - they fall back to the key as their
+   * label - because deleting a shelf must not take the music with it.
+   */
+  removeGenre(key) {
+    this.#state.genres = this.#state.genres.filter((g) => g.key !== key);
+    write(this.#state);
+    return this.genres();
+  }
+
   /** Put a track in a playlist, or take it out. @returns {boolean} now in it */
   setInPlaylist(playlistId, trackId, on) {
     const pl = this.playlist(playlistId);
@@ -490,7 +643,7 @@ class Admin {
       if (custom.source === source) return;
       custom.source = source;
       if (source === 'stream') {
-        custom.genre = GENRES.local.label;
+        custom.genre = this.genreLabel('local');
         custom.genreKey = 'local';
         custom.duration = 0;
       }
@@ -512,22 +665,57 @@ class Admin {
     return { version: 1, ...rest, exportedAt: new Date().toISOString() };
   }
 
-  /** Adopt a document wholesale — used when the file in the repo is newer. */
+  /**
+   * Adopt the document from the repository — without ever deleting anything.
+   *
+   * Replacing wholesale is what wiped a shelf once: tracks added before the
+   * token existed were not in the file, and the file won. So the file is
+   * merged in by id: its version of a track wins, tracks it does not mention
+   * stay, and the caller is told to flag the difference so those can be
+   * published. Playlists merge the same way. Site settings and the password
+   * are not shared - the password never leaves this browser.
+   */
   load(doc) {
     if (!doc || typeof doc !== 'object') throw new Error('Файл не похож на настройки Sonora');
+    const incoming = Array.isArray(doc.custom) ? doc.custom.filter((t) => t && typeof t.id === 'string') : [];
+    const byId = new Map(this.#state.custom.map((t) => [t.id, t]));
+    let added = 0;
+    for (const t of incoming) {
+      if (!byId.has(t.id)) added++;
+      byId.set(t.id, t);
+    }
+
+    const mine = this.#state.playlists;
+    const seen = new Set();
+    const playlists = normalisePlaylists(doc.playlists).map((p) => {
+      seen.add(p.id);
+      return p;
+    });
+    for (const p of mine) {
+      if (!seen.has(p.id)) playlists.push(p); // mine, not in the file yet
+    }
+
+    /* Genres merge the same way: the file's version of a key wins, a genre
+       that exists only here is kept so the file does not delete it either. */
+    const genreKeys = new Set();
+    const genres = normaliseGenres(doc.genres);
+    for (const g of genres) genreKeys.add(g.key);
+    for (const g of this.#state.genres) {
+      if (!genreKeys.has(g.key)) genres.push(g);
+    }
+
     this.#state = {
-      ...DEFAULTS(),
-      ...doc,
+      ...this.#state,
       site: { ...DEFAULTS().site, ...(doc.site || {}) },
       overrides: doc.overrides && typeof doc.overrides === 'object' ? doc.overrides : {},
       hidden: Array.isArray(doc.hidden) ? doc.hidden.filter((x) => typeof x === 'string') : [],
-      custom: Array.isArray(doc.custom) ? doc.custom.filter((t) => t && typeof t.id === 'string') : [],
-      playlists: normalisePlaylists(doc.playlists),
-      auth: this.#state.auth,
+      custom: [...byId.values()],
+      playlists,
+      genres,
     };
     this.prunePlaylists();
     write(this.#state);
-    return this.library();
+    return { library: this.library(), added, merged: true };
   }
 
   export() {

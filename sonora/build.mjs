@@ -129,6 +129,167 @@ if (missingExports.length) {
 }
 console.log('✓ экспорты совпадают');
 
+/* ------------------- 2b. проверка «вызвано, но не импортировано» ------------ */
+/* The check above only looks at what is written in an `import`. A bare call to
+   a name another module exports - `status()` with no import - passes every
+   other gate here and dies at runtime, in the one branch nobody exercises by
+   hand: the error path of a form. So: take every name the project exports,
+   and if a module calls one it did not import and did not define, say so. */
+const GLOBALS = new Set([
+  'window', 'document', 'console', 'globalThis', 'localStorage', 'sessionStorage',
+  'fetch', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+  'requestAnimationFrame', 'cancelAnimationFrame', 'queueMicrotask', 'alert',
+  'confirm', 'prompt', 'Blob', 'URL', 'Audio', 'Image', 'ImageData', 'AudioContext',
+  'CustomEvent', 'Event', 'EventTarget', 'Map', 'Set', 'WeakMap', 'Promise', 'Proxy',
+  'Reflect', 'Symbol', 'JSON', 'Math', 'Date', 'Object', 'Array', 'String', 'Number',
+  'Boolean', 'Error', 'RegExp', 'Intl', 'TextEncoder', 'TextDecoder', 'crypto',
+  'performance', 'navigator', 'location', 'history', 'matchMedia', 'getComputedStyle',
+  'requestIdleCallback', 'structuredClone', 'parseInt', 'parseFloat', 'isNaN',
+  'encodeURIComponent', 'decodeURIComponent', 'fetchRemote', 'require', 'undefined',
+]);
+
+const projectExports = new Map(); // name -> module that exports it
+for (const [file, mod] of modules) {
+  for (const [name] of mod.exports) {
+    if (!projectExports.has(name)) projectExports.set(name, modId(file));
+  }
+}
+
+/* объявления этого модуля: function/const/let/var/class + параметры + локальные */
+function declaredNames(src) {
+  const out = new Set();
+  const push = (s) => {
+    for (const n of String(s || '').split(',')) {
+      const id = n.split(/[:=]/)[0].replace(/\s*=.*$/, '').trim().replace(/^\.\.\./, '');
+      if (/^[A-Za-z_$][\w$]*$/.test(id)) out.add(id);
+    }
+  };
+  for (const m of src.matchAll(/\b(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/g)) out.add(m[1]);
+  for (const m of src.matchAll(/\bclass\s+([A-Za-z_$][\w$]*)/g)) out.add(m[1]);
+  for (const m of src.matchAll(/\b(?:const|let|var)\s+([^;=]+)/g)) push(m[1]);
+  /* параметры функций: хватает грубого разбора, имена изолированы запятыми */
+  for (const m of src.matchAll(/\(([^()]*)\)\s*(?:=>|\{)/g)) push(m[1]);
+  for (const m of src.matchAll(/\bcatch\s*\(\s*([A-Za-z_$][\w$]*)/g)) out.add(m[1]);
+  for (const m of src.matchAll(/for\s*\(\s*(?:const|let|var)\s+([^;]+);/g)) push(m[1]);
+  return out;
+}
+
+/**
+ * Комментарии и строки. Проверка имён бессмысленна по сырому тексту: в этом
+ * проекте слова вроде «on» или «status» встречаются в прозе чаще, чем в коде.
+ * Регулярка ленивая, поэтому состояние кавычек достаточно.
+ */
+function stripNoise(src) {
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  /* строки import и export {...} убираем: там перечислены чужие имена, и
+     проверка приняла бы их за обращения. `export const` трогать нельзя — за
+     ним само объявление */
+  src = src
+    .replace(/^[ \t]*import\s[^;\n]*;?[ \t]*$/gm, '')
+    .replace(/^[ \t]*export\s*\{[^}]*\};?[ \t]*$/gm, '');
+  while (i < n) {
+    const two = src.slice(i, i + 2);
+    if (two === '//') { while (i < n && src[i] !== '\n') i++; continue; }
+    if (two === '/*') { i += 2; while (i < n && src.slice(i, i + 2) !== '*/') i++; i += 2; continue; }
+    const ch = src[i];
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const quote = ch;
+      i++;
+      while (i < n && src[i] !== quote) {
+        if (src[i] === '\\') { i += 2; continue; }
+        if (quote === '`' && src[i] === '$' && src[i + 1] === '{') {
+          /* подстановка внутри шаблона — это код, её надо сохранить */
+          let depth = 1;
+          let j = i + 2;
+          while (j < n && depth > 0) {
+            if (src[j] === '{') depth++;
+            else if (src[j] === '}') depth--;
+            j++;
+          }
+          out += ' ' + src.slice(i + 2, j - 1) + ' ';
+          i = j;
+          continue;
+        }
+        i++;
+      }
+      i++;
+      out += ' STR ';
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+const undeclaredUses = [];
+
+/** индекс закрывающей скобки, парной открывающей на позиции open */
+function matchingParen(src, open) {
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+for (const [file, mod] of modules) {
+  const raw = readFileSync(file, 'utf8');
+  /* имена импортов снимаем из сырого текста, а сканируем уже очищенный: в
+     самих строках import перечислены чужие имена, и проверка приняла бы их
+     за обращения */
+  const imported = new Set();
+  for (const m of raw.matchAll(/import\s*\{([^}]*)\}\s*from/g)) {
+    for (const n of splitList(m[1])) imported.add(n.split(/\s+as\s+/).pop().trim());
+  }
+  for (const m of raw.matchAll(/import\s*\*\s*as\s+([A-Za-z_$][\w$]*)/g)) imported.add(m[1]);
+  for (const m of raw.matchAll(/import\s+([A-Za-z_$][\w$]*)\s*(?:,|from)/g)) imported.add(m[1]);
+
+  const src = stripNoise(raw);
+  const local = declaredNames(src);
+
+  /* вызов: имя сразу перед скобкой, без точки перед ним. Разделитель смотрим
+     lookbehind'ом, а не съедаем: иначе `Error(status())` теряется — после
+     `Error(` регулярка уже не может заглянуть назад за `(` */
+  const CALL_RE = /(?<![\w$.)\]])([A-Za-z_$][\w$]*)\s*\(/g;
+  for (const m of src.matchAll(CALL_RE)) {
+    const name = m[1];
+    if (GLOBALS.has(name) || local.has(name) || imported.has(name)) continue;
+    if (!projectExports.has(name)) continue;
+    /* `on(event, fn) {` - это объявление метода класса, а не вызов */
+    const open = m.index + m[0].length - 1;
+    const after = matchingParen(src, open);
+    if (after >= 0 && /^\s*\{/.test(src.slice(after + 1))) continue;
+    undeclaredUses.push(`${modId(file)} вызывает «${name}(…)», но не импортирует его из ${projectExports.get(name)}`);
+  }
+
+  /* и то же для обращения без вызова: `GENRE_COLORS[i]` падает ровно так же,
+     как `GENRE_COLORS()` — значение просто не приехало из модуля */
+  const READ_RE = /(?<![\w$.])([A-Za-z_$][\w$]*)/g;
+  for (const m of src.matchAll(READ_RE)) {
+    const name = m[1];
+    if (GLOBALS.has(name) || local.has(name) || imported.has(name)) continue;
+    if (!projectExports.has(name)) continue;
+    const tail = src.slice(m.index + name.length);
+    if (/^\s*[:(]/.test(tail)) continue; // ключ объекта или вызов — выше
+    if (/^\s*=[^=]/.test(tail)) continue; // присваивание
+    undeclaredUses.push(`${modId(file)} читает «${name}», но не импортирует его из ${projectExports.get(name)}`);
+  }
+}
+if (undeclaredUses.length) {
+  console.error('✗ вызывается то, что не импортировано:');
+  for (const line of [...new Set(undeclaredUses)]) console.error(`   ${line}`);
+  process.exit(1);
+}
+console.log('✓ вызовы разрешаются');
+
 /* ----------------------------- 3. топологический порядок ----------------- */
 const order = [];
 const done = new Set();

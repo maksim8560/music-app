@@ -74,23 +74,22 @@ export async function initSync() {
     const local = admin.library().length;
     const shared = (doc.custom || []).length;
 
-    /* An empty file, or one emptier than what this browser already holds, must
-       not quietly replace it. The file is the shared truth and wins on
-       content - but it does not get to delete something silently. That is how a
-       deploy carrying a placeholder catalogue wipes a shelf that was never
-       written to the repository in the first place. */
+    /* Merge, never replace: the file wins on the tracks it mentions, and the
+       ones it does not are kept and flagged. An empty or behind file used to
+       delete a shelf outright, which is how tracks added before the token
+       existed disappeared on reload. */
+    const { added } = admin.load(doc);
+    player.reconcile();
+    const kept = admin.library().length - shared;
+    pendingPublish = kept > 0;
+
     if (shared === 0 && local > 0) {
-      pendingPublish = true;
-      set('diverged', `В файле пусто, а в этом браузере ${local} — запишите их в файл, иначе на других устройствах будет пусто`);
+      set('diverged', `В файле каталога пусто, а в этом браузере ${local} — они не стираются, но пока не видны другим. Запишите их в файл.`);
       return;
     }
-    if (shared < local) pendingPublish = true;
-
-    admin.load(doc);
-    player.reconcile();
     set(remoteWritable() ? 'idle' : 'readonly',
       pendingPublish
-        ? 'Каталог взят из репозитория; часть треков есть только в этом браузере'
+        ? `Каталог взят из репозитория${added ? `, добавлено оттуда: ${added}` : ''}. Здесь есть ещё ${kept} — они только в этом браузере.`
         : 'Каталог взят из репозитория');
   } catch (err) {
     /* A catalogue we could not read must never stop the page from opening:

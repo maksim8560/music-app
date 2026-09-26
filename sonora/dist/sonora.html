@@ -2005,7 +2005,9 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
 .art--xl:focus-within .art__play { opacity: 1; scale: 1; }
 .art__play svg { fill: currentColor; stroke: none; margin-left: 3px; }
 .art__play:hover { scale: 1.06; }
-.is-playing .art__play { opacity: 0; scale: 0.8; }
+/* the artwork button stays put and swaps play for pause - hiding it left the
+   artwork looking tappable while nothing happened on click */
+.art__play.is-playing svg { margin-left: 0; }
 
 /* ---------------------------- transport --------------------------------- */
 .transport {
@@ -2592,6 +2594,67 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
 .adm-dot--electronic { --dot: #63f5d2; }
 .adm-dot--neo { --dot: #d79bff; }
 .adm-dot--local { --dot: var(--text-3); }
+.adm-dot--new { border: 1px dashed var(--text-3); background: none; }
+
+/* ---------------------------------- genres -------------------------------- */
+/* A genre the admin made has a colour of its own, applied inline, so these
+   rows need no per-genre class. */
+.adm-block {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--fill-1);
+  overflow: hidden;
+}
+.adm-block__head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  padding: 12px 14px;
+}
+.adm-block__head h3 { flex: 1; font-size: 0.95rem; }
+.adm-block__count {
+  font-size: 0.78rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.adm-genres {
+  display: grid;
+  gap: 6px;
+  padding: 0 14px 14px;
+}
+.adm-genre {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+}
+.adm-genre .adm-input { flex: 1; min-width: 0; }
+.adm-genre--new { padding-top: 6px; border-top: 1px solid var(--line); margin-top: 4px; }
+.adm-genre__swatch {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.adm-genre__swatch input[type="color"] {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.adm-genre__pick { width: 22px; height: 22px; padding: 0; border: 0; background: none; cursor: pointer; }
+.adm-genre__swatch:hover { border-color: var(--accent-a); }
+.adm-hint { font-size: 0.8rem; color: var(--text-3); line-height: 1.5; }
+
+@media (pointer: coarse) {
+  .adm-genre__swatch { width: 44px; height: 44px; }
+  .adm-genre__swatch input[type="color"] { width: 28px; height: 28px; }
+}
 
 .adm-url code {
   display: block;
@@ -5046,8 +5109,67 @@ const DEFAULTS = () => ({
   custom: [],
   /* the admin's own playlists: [{ id, name, trackIds }] */
   playlists: [],
+  /* the admin's own genres, on top of the built-in ones: [{ key, label, color }] */
+  genres: [],
   updatedAt: 0,
 });
+
+/** Colours a new genre can be given, so the rail stays readable. */
+const GENRE_COLORS = [
+  '#7c8cff', '#63f5d2', '#ffb26b', '#d79bff', '#ff6b81', '#6bd3ff',
+  '#a8e06a', '#f5a3d0', '#ffd166', '#8de0c0', '#c4a7ff', '#ff9f7a',
+];
+
+/** The built-in genres, kept always available and used as the seed. */
+const BUILTIN_GENRES = Object.entries(GENRES).map(([key, g], i) => ({
+  key,
+  label: g.label,
+  color: GENRE_COLORS[i % GENRE_COLORS.length],
+  builtin: true,
+}));
+
+/**
+ * A key has to survive a `data-filter`, a CSS class and a query string, so it
+ * stays latin and lowercase even when the name is written in Cyrillic.
+ */
+const TRANSLIT = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
+  и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+  с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch',
+  ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+};
+
+function slugify(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[а-яё]/g, (ch) => TRANSLIT[ch] ?? ch)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+}
+
+/**
+ * The genres the admin made. Built-in ones are never stored - they are always
+ * there - so this list only holds what was added on top, and renaming a
+ * built-in works by shadowing its label.
+ */
+function normaliseGenres(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  const keys = new Set();
+  for (const g of list) {
+    if (!g || typeof g !== 'object') continue;
+    const key = String(g.key || '').trim().toLowerCase();
+    if (!key || keys.has(key)) continue;
+    keys.add(key);
+    out.push({
+      key,
+      label: String(g.label || g.key).slice(0, 40),
+      color: /^#[0-9a-f]{6}$/i.test(g.color || '') ? g.color : GENRE_COLORS[out.length % GENRE_COLORS.length],
+    });
+  }
+  return out;
+}
 
 /** Older saves have no playlists; keep the shape honest on the way in. */
 function normalisePlaylists(list) {
@@ -5079,6 +5201,7 @@ function read() {
       hidden: Array.isArray(saved.hidden) ? saved.hidden : [],
       custom: Array.isArray(saved.custom) ? saved.custom : [],
       playlists: normalisePlaylists(saved.playlists),
+      genres: normaliseGenres(saved.genres),
     };
   } catch {
     return DEFAULTS();
@@ -5241,7 +5364,8 @@ class Admin {
     for (const key of EDITABLE) {
       if (key in patch && patch[key] !== undefined && patch[key] !== null) clean[key] = patch[key];
     }
-    if (clean.genreKey && !GENRES[clean.genreKey]) delete clean.genreKey;
+    /* the admin's own genres count, so a track may be filed under one of them */
+    if (clean.genreKey && !this.genre(clean.genreKey)) delete clean.genreKey;
     if ('coverUrl' in clean) clean.coverUrl = safeImage(clean.coverUrl);
     const custom = this.#state.custom.find((t) => t.id === id);
     if (custom) {
@@ -5291,14 +5415,14 @@ class Admin {
   /** A hand-built generative track, modelled on the shipped ones. */
   addGenerative(partial = {}) {
     const id = this.#nextId('admin');
-    const genreKey = GENRES[partial.genreKey] ? partial.genreKey : 'ambient';
+    const genreKey = this.genre(partial.genreKey) ? partial.genreKey : 'ambient';
     const track = {
       id,
       title: partial.title?.trim() || 'Без названия',
       artist: partial.artist?.trim() || 'Неизвестный исполнитель',
       album: partial.album?.trim() || 'Своя подборка',
       year: Number(partial.year) || new Date().getFullYear(),
-      genre: partial.genre?.trim() || GENRES[genreKey].label,
+      genre: partial.genre?.trim() || this.genreLabel(genreKey),
       genreKey,
       duration: clampNum(partial.duration, 60, 3600, 210),
       bpm: clampNum(partial.bpm, 40, 200, 84),
@@ -5335,8 +5459,10 @@ class Admin {
       artist: artist?.trim() || (live ? 'Радио' : 'По ссылке'),
       album: album?.trim() || (live ? 'Эфир' : 'Ссылки'),
       year: new Date().getFullYear(),
-      genre: live ? 'Радио' : (GENRES[genreKey]?.label || GENRES.local.label),
-      genreKey: live ? 'local' : (GENRES[genreKey] ? genreKey : 'local'),
+      /* an unknown key must not leak into the label: a track called "дарквейв"
+         under the raw key reads like a bug, not like a genre */
+      genre: live ? 'Радио' : (this.genre(genreKey) ? this.genreLabel(genreKey) : this.genreLabel('local')),
+      genreKey: live ? 'local' : (this.genre(genreKey) ? genreKey : 'local'),
       /* 0 until a file is fetched and decoded — the clock fills in then. A
          stream has no length at all, and 0 is how the transport reads that. */
       duration: 0,
@@ -5429,6 +5555,96 @@ class Admin {
     return this.#state.playlists;
   }
 
+  /* ------------------------------- genres -------------------------------- */
+
+  /**
+   * Every genre available to a track: the built-in five, plus whatever the
+   * admin added, plus any label the admin gave a built-in key. Renaming a
+   * built-in shadows its label rather than forking it, so old tracks keep
+   * working and nothing is duplicated in the dropdown.
+   */
+  genres() {
+    const out = BUILTIN_GENRES.map((g) => ({ ...g }));
+    for (const g of this.#state.genres) {
+      const found = out.find((x) => x.key === g.key);
+      if (found) Object.assign(found, { label: g.label, color: g.color, custom: true, builtin: false });
+      else out.push({ ...g, custom: true });
+    }
+    return out;
+  }
+
+  genre(key) {
+    return this.genres().find((g) => g.key === key) || null;
+  }
+
+  genreLabel(key) {
+    return this.genre(key)?.label || key || '';
+  }
+
+  genreColor(key) {
+    return this.genre(key)?.color || GENRE_COLORS[0];
+  }
+
+  addGenre(label, color) {
+    const clean = (label || '').trim();
+    if (!clean) throw new Error('Дайте жанру название');
+    /* by name, not by key: "Дарквейв" and "дарквейв" are the same genre, and a
+       transliterated key would happily make them look like two */
+    const clash = this.genres().find((g) => g.label.trim().toLowerCase() === clean.toLowerCase());
+    if (clash) throw new Error(`Жанр «${clash.label}» уже есть`);
+    const taken = new Set(this.genres().map((g) => g.key));
+    let key = slugify(clean);
+    if (!key) key = `genre-${this.#state.genres.length + 1}`;
+    if (taken.has(key)) {
+      let n = 2;
+      while (taken.has(`${key}-${n}`)) n++;
+      key = `${key}-${n}`;
+    }
+    const genre = {
+      key,
+      label: clean.slice(0, 40),
+      color: /^#[0-9a-f]{6}$/i.test(color || '') ? color : GENRE_COLORS[this.#state.genres.length % GENRE_COLORS.length],
+    };
+    this.#state.genres.push(genre);
+    write(this.#state);
+    return genre;
+  }
+
+  renameGenre(key, label, color) {
+    const clean = (label || '').trim();
+    if (!clean) throw new Error('Дайте жанру название');
+    const mine = this.#state.genres.find((g) => g.key === key);
+    if (mine) {
+      mine.label = clean.slice(0, 40);
+      if (/^#[0-9a-f]{6}$/i.test(color || '')) mine.color = color;
+    } else if (BUILTIN_GENRES.some((g) => g.key === key)) {
+      /* a built-in, shadowed so the new name follows it everywhere */
+      this.#state.genres.push({
+        key,
+        label: clean.slice(0, 40),
+        color: /^#[0-9a-f]{6}$/i.test(color || '') ? color : this.genreColor(key),
+      });
+    } else {
+      return null;
+    }
+    /* tracks that only carried the key must learn the new name */
+    for (const t of this.#state.custom) {
+      if (t.genreKey === key) t.genre = clean.slice(0, 40);
+    }
+    write(this.#state);
+    return this.genre(key);
+  }
+
+  /**
+   * Remove a genre. Tracks keep playing - they fall back to the key as their
+   * label - because deleting a shelf must not take the music with it.
+   */
+  removeGenre(key) {
+    this.#state.genres = this.#state.genres.filter((g) => g.key !== key);
+    write(this.#state);
+    return this.genres();
+  }
+
   /** Put a track in a playlist, or take it out. @returns {boolean} now in it */
   setInPlaylist(playlistId, trackId, on) {
     const pl = this.playlist(playlistId);
@@ -5468,7 +5684,7 @@ class Admin {
       if (custom.source === source) return;
       custom.source = source;
       if (source === 'stream') {
-        custom.genre = GENRES.local.label;
+        custom.genre = this.genreLabel('local');
         custom.genreKey = 'local';
         custom.duration = 0;
       }
@@ -5490,22 +5706,57 @@ class Admin {
     return { version: 1, ...rest, exportedAt: new Date().toISOString() };
   }
 
-  /** Adopt a document wholesale — used when the file in the repo is newer. */
+  /**
+   * Adopt the document from the repository — without ever deleting anything.
+   *
+   * Replacing wholesale is what wiped a shelf once: tracks added before the
+   * token existed were not in the file, and the file won. So the file is
+   * merged in by id: its version of a track wins, tracks it does not mention
+   * stay, and the caller is told to flag the difference so those can be
+   * published. Playlists merge the same way. Site settings and the password
+   * are not shared - the password never leaves this browser.
+   */
   load(doc) {
     if (!doc || typeof doc !== 'object') throw new Error('Файл не похож на настройки Sonora');
+    const incoming = Array.isArray(doc.custom) ? doc.custom.filter((t) => t && typeof t.id === 'string') : [];
+    const byId = new Map(this.#state.custom.map((t) => [t.id, t]));
+    let added = 0;
+    for (const t of incoming) {
+      if (!byId.has(t.id)) added++;
+      byId.set(t.id, t);
+    }
+
+    const mine = this.#state.playlists;
+    const seen = new Set();
+    const playlists = normalisePlaylists(doc.playlists).map((p) => {
+      seen.add(p.id);
+      return p;
+    });
+    for (const p of mine) {
+      if (!seen.has(p.id)) playlists.push(p); // mine, not in the file yet
+    }
+
+    /* Genres merge the same way: the file's version of a key wins, a genre
+       that exists only here is kept so the file does not delete it either. */
+    const genreKeys = new Set();
+    const genres = normaliseGenres(doc.genres);
+    for (const g of genres) genreKeys.add(g.key);
+    for (const g of this.#state.genres) {
+      if (!genreKeys.has(g.key)) genres.push(g);
+    }
+
     this.#state = {
-      ...DEFAULTS(),
-      ...doc,
+      ...this.#state,
       site: { ...DEFAULTS().site, ...(doc.site || {}) },
       overrides: doc.overrides && typeof doc.overrides === 'object' ? doc.overrides : {},
       hidden: Array.isArray(doc.hidden) ? doc.hidden.filter((x) => typeof x === 'string') : [],
-      custom: Array.isArray(doc.custom) ? doc.custom.filter((t) => t && typeof t.id === 'string') : [],
-      playlists: normalisePlaylists(doc.playlists),
-      auth: this.#state.auth,
+      custom: [...byId.values()],
+      playlists,
+      genres,
     };
     this.prunePlaylists();
     write(this.#state);
-    return this.library();
+    return { library: this.library(), added, merged: true };
   }
 
   export() {
@@ -5559,7 +5810,7 @@ function clampNum(value, min, max, fallback) {
 
 const admin = new Admin();
 
-return { PLAYLIST_ICONS, MIN_PASSWORD, admin };
+return { PLAYLIST_ICONS, MIN_PASSWORD, GENRE_COLORS, admin };
 });
 
 __mod("scripts/audio/files.js", function () {
@@ -7227,23 +7478,22 @@ async function initSync() {
     const local = admin.library().length;
     const shared = (doc.custom || []).length;
 
-    /* An empty file, or one emptier than what this browser already holds, must
-       not quietly replace it. The file is the shared truth and wins on
-       content - but it does not get to delete something silently. That is how a
-       deploy carrying a placeholder catalogue wipes a shelf that was never
-       written to the repository in the first place. */
+    /* Merge, never replace: the file wins on the tracks it mentions, and the
+       ones it does not are kept and flagged. An empty or behind file used to
+       delete a shelf outright, which is how tracks added before the token
+       existed disappeared on reload. */
+    const { added } = admin.load(doc);
+    player.reconcile();
+    const kept = admin.library().length - shared;
+    pendingPublish = kept > 0;
+
     if (shared === 0 && local > 0) {
-      pendingPublish = true;
-      set('diverged', `В файле пусто, а в этом браузере ${local} — запишите их в файл, иначе на других устройствах будет пусто`);
+      set('diverged', `В файле каталога пусто, а в этом браузере ${local} — они не стираются, но пока не видны другим. Запишите их в файл.`);
       return;
     }
-    if (shared < local) pendingPublish = true;
-
-    admin.load(doc);
-    player.reconcile();
     set(remoteWritable() ? 'idle' : 'readonly',
       pendingPublish
-        ? 'Каталог взят из репозитория; часть треков есть только в этом браузере'
+        ? `Каталог взят из репозитория${added ? `, добавлено оттуда: ${added}` : ''}. Здесь есть ещё ${kept} — они только в этом браузере.`
         : 'Каталог взят из репозитория');
   } catch (err) {
     /* A catalogue we could not read must never stop the page from opening:
@@ -7730,6 +7980,11 @@ function syncState() {
     btn.classList.toggle('is-playing', playing);
     btn.setAttribute('aria-label', playing ? 'Пауза' : 'Воспроизвести');
   }
+  /* The button on the artwork had its triangle baked into the markup, so it
+     kept inviting you to start a track that was already running. */
+  dom.heroArtPlay.classList.toggle('is-playing', playing);
+  dom.heroArtPlay.setAttribute('aria-label', playing ? 'Пауза' : 'Воспроизвести');
+  dom.heroArtPlay.querySelector('use')?.setAttribute('href', playing ? '#i-pause' : '#i-play');
   dom.app.classList.toggle('is-playing', playing);
   dom.app.classList.toggle('is-paused', !playing);
   dom.playbar.dataset.idle = String(!store.get('currentId'));
@@ -8541,9 +8796,9 @@ __mod("scripts/ui/admin.js", function () {
 const { on: on, qs: qs, qsa: qsa, plural: plural } = __req("scripts/core/dom.js");
 const { store: store } = __req("scripts/core/store.js");
 const { player: player } = __req("scripts/core/player.js");
-const { admin: admin, PLAYLIST_ICONS: PLAYLIST_ICONS } = __req("scripts/data/admin.js");
+const { admin: admin, PLAYLIST_ICONS: PLAYLIST_ICONS, GENRE_COLORS: GENRE_COLORS } = __req("scripts/data/admin.js");
 const { remoteConfig: remoteConfig, saveRemoteConfig: saveRemoteConfig } = __req("scripts/data/remote.js");
-const { onSyncChange: onSyncChange, syncNow: syncNow, testSync: testSync, disableSync: disableSync, markDirty: markDirty } = __req("scripts/data/sync.js");
+const { onSyncChange: onSyncChange, syncNow: syncNow, testSync: testSync, disableSync: disableSync, markDirty: markDirty, status: status } = __req("scripts/data/sync.js");
 const { remoteWritable: remoteWritable } = __req("scripts/data/remote.js");
 const { GENRES: GENRES } = __req("scripts/data/tracks.js");
 const { SCALES: SCALES } = __req("scripts/audio/synth.js");
@@ -8608,6 +8863,21 @@ const icon = (name, size = 16) => {
   svg.append(use);
   return svg;
 };
+
+/** Built-in genres plus the admin's own, as [key, label] for a <select>. */
+const genreOptions = () => admin.genres().map((g) => [g.key, g.label]);
+
+/**
+ * The coloured dot beside a track. A genre the admin made has a colour of its
+ * own, and there is no CSS class to hang it on, so it goes inline.
+ */
+function genreDot(key) {
+  const dot = el('span', { class: 'adm-dot' });
+  const g = admin.genre(key);
+  if (g) dot.style.background = g.color;
+  else if (GENRES[key]) dot.className = `adm-dot adm-dot--${key}`;
+  return dot;
+}
 
 /** Every catalogue change goes through here so the player stays in step. */
 function catalogueChanged(message) {
@@ -8835,7 +9105,7 @@ function trackRow(track) {
   };
 
   const head = el('div', { class: 'adm-track__head' }, [
-    el('span', { class: `adm-dot adm-dot--${track.genreKey || 'local'}` }),
+    genreDot(track.genreKey || 'local'),
     el('div', { class: 'adm-track__id' }, [titleEl, idEl]),
     tagsEl,
     button('Сбросить', discard, 'ghost-btn ghost-btn--sm'),
@@ -8846,9 +9116,9 @@ function trackRow(track) {
     field('Исполнитель', input(track.artist, (v) => set('artist', v), { maxlength: '60' })),
     field('Альбом', input(track.album, (v) => set('album', v), { maxlength: '60' })),
     field('Год', numberInput(track.year, (v) => set('year', Number(v) || 0), { min: '1900', max: '2999' })),
-    field('Жанр', select(track.genreKey, Object.entries(GENRES).map(([k, g]) => [k, g.label]), (v) => {
+    field('Жанр', select(track.genreKey, genreOptions(), (v) => {
       draft.genreKey = v;
-      draft.genre = GENRES[v]?.label || v;
+      draft.genre = admin.genreLabel(v) || v;
       refreshSave();
     })),
   ];
@@ -8941,7 +9211,10 @@ function addUrlForm() {
   };
   const genreField = el('div', { class: 'adm-field' }, [
     el('span', { class: 'adm-field__label', text: 'Жанр' }),
-    select(draft.genreKey, Object.entries(GENRES).map(([k, g]) => [k, g.label]), (v) => { draft.genreKey = v; }),
+    select(draft.genreKey, genreOptions(), (v) => {
+      draft.genreKey = v;
+      draft.genre = admin.genreLabel(v) || v;
+    }),
   ]);
 
   const setPreview = (value) => {
@@ -9050,8 +9323,96 @@ function renderMusic() {
         } }),
     ]),
     el('div', { class: 'adm-extra adm-grid--wide', id: 'adm-extra', hidden: !addFormOpen }, [addUrlForm()]),
+    genreBlock(),
     list,
   );
+}
+
+/* -------------------------------- genres ---------------------------------- */
+
+let genresOpen = false;
+
+/**
+ * The admin's own genres.
+ *
+ * The five that ship with Sonora are a starting point, not a menu: they can be
+ * renamed, recoloured and added to here, and they are stored in the repository
+ * file like everything else, so a genre made on the phone is on the desktop.
+ */
+function genreBlock() {
+  const genres = admin.genres();
+  const mine = genres.filter((g) => g.custom || g.builtin === false);
+
+  const rows = genres.map((g) => {
+    const swatch = el('label', { class: 'adm-genre__swatch', title: 'Цвет' },
+      [el('input', {
+        type: 'color', value: g.color, 'aria-label': `Цвет жанра ${g.label}`,
+        oninput: (e) => {
+          admin.renameGenre(g.key, g.label, e.target.value);
+          catalogueChanged(`Жанр «${g.label}» перекрашен`);
+        },
+      })]);
+    return el('div', { class: 'adm-genre' }, [
+      genreDot(g.key),
+      el('input', {
+        class: 'adm-input', value: g.label, maxlength: '40', 'aria-label': 'Название жанра',
+        onchange: (e) => {
+          const clean = e.target.value.trim();
+          if (!clean) { e.target.value = g.label; return; }
+          try {
+            admin.renameGenre(g.key, clean, g.color);
+            renderMusic();
+            catalogueChanged(`Жанр переименован на «${clean}»`);
+          } catch (err) {
+            toast(String(err.message || err), 'error');
+          }
+        },
+      }),
+      swatch,
+      button('✕', () => {
+        if (!confirm(`Убрать жанр «${g.label}»? Треки останутся, но станут без жанра.`)) return;
+        admin.removeGenre(g.key);
+        renderMusic();
+        catalogueChanged(`Жанр «${g.label}» убран`);
+      }, 'ghost-btn ghost-btn--sm'),
+    ]);
+  });
+
+  const nameInput = el('input', { class: 'adm-input', placeholder: 'Название жанра', maxlength: '40', id: 'adm-genre-name' });
+  const colorInput = el('input', { type: 'color', class: 'adm-genre__pick', value: GENRE_COLORS[mine.length % GENRE_COLORS.length], 'aria-label': 'Цвет нового жанра' });
+
+  const add = () => {
+    const clean = nameInput.value.trim();
+    if (!clean) { toast('Дайте жанру название', 'error'); return; }
+    try {
+      admin.addGenre(clean, colorInput.value);
+      nameInput.value = '';
+      renderMusic();
+      catalogueChanged(`Жанр «${clean}» создан`);
+      qs('#adm-genre-name')?.focus();
+    } catch (err) {
+      toast(String(err.message || err), 'error');
+    }
+  };
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+
+  return el('section', { class: 'adm-block' }, [
+    el('div', { class: 'adm-block__head' }, [
+      el('h3', { text: 'Жанры' }),
+      el('span', { class: 'adm-block__count', text: `${genres.length}` }),
+      button(genresOpen ? 'Скрыть' : 'Изменить', () => { genresOpen = !genresOpen; renderMusic(); }, 'ghost-btn ghost-btn--sm'),
+    ]),
+    el('div', { class: 'adm-genres', id: 'adm-genres', hidden: !genresOpen }, [
+      ...rows,
+      el('div', { class: 'adm-genre adm-genre--new' }, [
+        el('span', { class: 'adm-dot adm-dot--new' }),
+        nameInput,
+        el('label', { class: 'adm-genre__swatch' }, [colorInput]),
+        button('Создать', add, 'primary-btn primary-btn--sm'),
+      ]),
+      el('p', { class: 'adm-hint', text: 'Жанр выбирается в карточке трека. Переименование подхватывают и треки, которые уже стояли в этом жанре.' }),
+    ]),
+  ]);
 }
 
 /* ------------------------------- playlists ------------------------------- */
@@ -9415,7 +9776,10 @@ function openAdmin(tab = 'site', { expandAdd = false } = {}) {
   if (!root) return;
   open = true;
   qs('#btn-admin')?.setAttribute('aria-expanded', 'true');
-  if (admin.authed) showPanel();
+  /* `authed` lives in sessionStorage, which anyone can type into from the
+     console, so it is not a lock on its own. A stored token is. Without one
+     there is nothing to write with, so the gate comes back. */
+  if (admin.authed && remoteWritable()) showPanel();
   else showGate();
   openSheet(root);
   switchTab(tab);

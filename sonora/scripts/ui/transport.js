@@ -135,6 +135,11 @@ export function syncState() {
     btn.classList.toggle('is-playing', playing);
     btn.setAttribute('aria-label', playing ? 'Пауза' : 'Воспроизвести');
   }
+  /* The button on the artwork had its triangle baked into the markup, so it
+     kept inviting you to start a track that was already running. */
+  dom.heroArtPlay.classList.toggle('is-playing', playing);
+  dom.heroArtPlay.setAttribute('aria-label', playing ? 'Пауза' : 'Воспроизвести');
+  dom.heroArtPlay.querySelector('use')?.setAttribute('href', playing ? '#i-pause' : '#i-play');
   dom.app.classList.toggle('is-playing', playing);
   dom.app.classList.toggle('is-paused', !playing);
   dom.playbar.dataset.idle = String(!store.get('currentId'));

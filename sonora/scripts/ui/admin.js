@@ -17,9 +17,9 @@
 import { on, qs, qsa, plural } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
-import { admin, PLAYLIST_ICONS } from '../data/admin.js';
+import { admin, PLAYLIST_ICONS, GENRE_COLORS } from '../data/admin.js';
 import { remoteConfig, saveRemoteConfig } from '../data/remote.js';
-import { onSyncChange, syncNow, testSync, disableSync, markDirty } from '../data/sync.js';
+import { onSyncChange, syncNow, testSync, disableSync, markDirty, status } from '../data/sync.js';
 import { remoteWritable } from '../data/remote.js';
 import { GENRES } from '../data/tracks.js';
 import { SCALES } from '../audio/synth.js';
@@ -84,6 +84,21 @@ const icon = (name, size = 16) => {
   svg.append(use);
   return svg;
 };
+
+/** Built-in genres plus the admin's own, as [key, label] for a <select>. */
+const genreOptions = () => admin.genres().map((g) => [g.key, g.label]);
+
+/**
+ * The coloured dot beside a track. A genre the admin made has a colour of its
+ * own, and there is no CSS class to hang it on, so it goes inline.
+ */
+function genreDot(key) {
+  const dot = el('span', { class: 'adm-dot' });
+  const g = admin.genre(key);
+  if (g) dot.style.background = g.color;
+  else if (GENRES[key]) dot.className = `adm-dot adm-dot--${key}`;
+  return dot;
+}
 
 /** Every catalogue change goes through here so the player stays in step. */
 function catalogueChanged(message) {
@@ -311,7 +326,7 @@ function trackRow(track) {
   };
 
   const head = el('div', { class: 'adm-track__head' }, [
-    el('span', { class: `adm-dot adm-dot--${track.genreKey || 'local'}` }),
+    genreDot(track.genreKey || 'local'),
     el('div', { class: 'adm-track__id' }, [titleEl, idEl]),
     tagsEl,
     button('Сбросить', discard, 'ghost-btn ghost-btn--sm'),
@@ -322,9 +337,9 @@ function trackRow(track) {
     field('Исполнитель', input(track.artist, (v) => set('artist', v), { maxlength: '60' })),
     field('Альбом', input(track.album, (v) => set('album', v), { maxlength: '60' })),
     field('Год', numberInput(track.year, (v) => set('year', Number(v) || 0), { min: '1900', max: '2999' })),
-    field('Жанр', select(track.genreKey, Object.entries(GENRES).map(([k, g]) => [k, g.label]), (v) => {
+    field('Жанр', select(track.genreKey, genreOptions(), (v) => {
       draft.genreKey = v;
-      draft.genre = GENRES[v]?.label || v;
+      draft.genre = admin.genreLabel(v) || v;
       refreshSave();
     })),
   ];
@@ -417,7 +432,10 @@ function addUrlForm() {
   };
   const genreField = el('div', { class: 'adm-field' }, [
     el('span', { class: 'adm-field__label', text: 'Жанр' }),
-    select(draft.genreKey, Object.entries(GENRES).map(([k, g]) => [k, g.label]), (v) => { draft.genreKey = v; }),
+    select(draft.genreKey, genreOptions(), (v) => {
+      draft.genreKey = v;
+      draft.genre = admin.genreLabel(v) || v;
+    }),
   ]);
 
   const setPreview = (value) => {
@@ -526,8 +544,96 @@ function renderMusic() {
         } }),
     ]),
     el('div', { class: 'adm-extra adm-grid--wide', id: 'adm-extra', hidden: !addFormOpen }, [addUrlForm()]),
+    genreBlock(),
     list,
   );
+}
+
+/* -------------------------------- genres ---------------------------------- */
+
+let genresOpen = false;
+
+/**
+ * The admin's own genres.
+ *
+ * The five that ship with Sonora are a starting point, not a menu: they can be
+ * renamed, recoloured and added to here, and they are stored in the repository
+ * file like everything else, so a genre made on the phone is on the desktop.
+ */
+function genreBlock() {
+  const genres = admin.genres();
+  const mine = genres.filter((g) => g.custom || g.builtin === false);
+
+  const rows = genres.map((g) => {
+    const swatch = el('label', { class: 'adm-genre__swatch', title: 'Цвет' },
+      [el('input', {
+        type: 'color', value: g.color, 'aria-label': `Цвет жанра ${g.label}`,
+        oninput: (e) => {
+          admin.renameGenre(g.key, g.label, e.target.value);
+          catalogueChanged(`Жанр «${g.label}» перекрашен`);
+        },
+      })]);
+    return el('div', { class: 'adm-genre' }, [
+      genreDot(g.key),
+      el('input', {
+        class: 'adm-input', value: g.label, maxlength: '40', 'aria-label': 'Название жанра',
+        onchange: (e) => {
+          const clean = e.target.value.trim();
+          if (!clean) { e.target.value = g.label; return; }
+          try {
+            admin.renameGenre(g.key, clean, g.color);
+            renderMusic();
+            catalogueChanged(`Жанр переименован на «${clean}»`);
+          } catch (err) {
+            toast(String(err.message || err), 'error');
+          }
+        },
+      }),
+      swatch,
+      button('✕', () => {
+        if (!confirm(`Убрать жанр «${g.label}»? Треки останутся, но станут без жанра.`)) return;
+        admin.removeGenre(g.key);
+        renderMusic();
+        catalogueChanged(`Жанр «${g.label}» убран`);
+      }, 'ghost-btn ghost-btn--sm'),
+    ]);
+  });
+
+  const nameInput = el('input', { class: 'adm-input', placeholder: 'Название жанра', maxlength: '40', id: 'adm-genre-name' });
+  const colorInput = el('input', { type: 'color', class: 'adm-genre__pick', value: GENRE_COLORS[mine.length % GENRE_COLORS.length], 'aria-label': 'Цвет нового жанра' });
+
+  const add = () => {
+    const clean = nameInput.value.trim();
+    if (!clean) { toast('Дайте жанру название', 'error'); return; }
+    try {
+      admin.addGenre(clean, colorInput.value);
+      nameInput.value = '';
+      renderMusic();
+      catalogueChanged(`Жанр «${clean}» создан`);
+      qs('#adm-genre-name')?.focus();
+    } catch (err) {
+      toast(String(err.message || err), 'error');
+    }
+  };
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+
+  return el('section', { class: 'adm-block' }, [
+    el('div', { class: 'adm-block__head' }, [
+      el('h3', { text: 'Жанры' }),
+      el('span', { class: 'adm-block__count', text: `${genres.length}` }),
+      button(genresOpen ? 'Скрыть' : 'Изменить', () => { genresOpen = !genresOpen; renderMusic(); }, 'ghost-btn ghost-btn--sm'),
+    ]),
+    el('div', { class: 'adm-genres', id: 'adm-genres', hidden: !genresOpen }, [
+      ...rows,
+      el('div', { class: 'adm-genre adm-genre--new' }, [
+        el('span', { class: 'adm-dot adm-dot--new' }),
+        nameInput,
+        el('label', { class: 'adm-genre__swatch' }, [colorInput]),
+        button('Создать', add, 'primary-btn primary-btn--sm'),
+      ]),
+      el('p', { class: 'adm-hint', text: 'Жанр выбирается в карточке трека. Переименование подхватывают и треки, которые уже стояли в этом жанре.' }),
+    ]),
+  ]);
 }
 
 /* ------------------------------- playlists ------------------------------- */
@@ -891,7 +997,10 @@ export function openAdmin(tab = 'site', { expandAdd = false } = {}) {
   if (!root) return;
   open = true;
   qs('#btn-admin')?.setAttribute('aria-expanded', 'true');
-  if (admin.authed) showPanel();
+  /* `authed` lives in sessionStorage, which anyone can type into from the
+     console, so it is not a lock on its own. A stored token is. Without one
+     there is nothing to write with, so the gate comes back. */
+  if (admin.authed && remoteWritable()) showPanel();
   else showGate();
   openSheet(root);
   switchTab(tab);

@@ -126,7 +126,9 @@
 .art--xl:focus-within .art__play { opacity: 1; scale: 1; }
 .art__play svg { fill: currentColor; stroke: none; margin-left: 3px; }
 .art__play:hover { scale: 1.06; }
-.is-playing .art__play { opacity: 0; scale: 0.8; }
+/* the artwork button stays put and swaps play for pause - hiding it left the
+   artwork looking tappable while nothing happened on click */
+.art__play.is-playing svg { margin-left: 0; }
 
 /* ---------------------------- transport --------------------------------- */
 .transport {
