@@ -8,7 +8,7 @@ import { store } from './core/store.js';
 import { player } from './core/player.js';
 import { engine } from './audio/engine.js';
 import { renderLibrary, syncLibrary } from './ui/library.js';
-import { renderSidePlaylists } from './ui/sidebar.js';
+import { renderSidePlaylists, initSidebarPlaylists } from './ui/sidebar.js';
 import { renderQueue } from './ui/queue.js';
 import { initTransport, syncTrack, syncState, syncVolume, syncLike } from './ui/transport.js';
 import { initPalette, open as openPalette, paletteShortcut } from './ui/palette.js';
@@ -88,11 +88,7 @@ function flush() {
    Counters
    ========================================================================== */
 function updateCounters() {
-  const all = qs('#side-count-all');
-  const local = qs('#side-count-local');
   const likes = qs('#nav-like-count');
-  if (all) all.textContent = String(player.ordered().length);
-  if (local) local.textContent = String(player.localTracks.length);
   if (likes) likes.textContent = String((store.get('likes') || []).length);
 }
 
@@ -135,12 +131,8 @@ function initNav() {
     });
   });
 
-  /* Delegated, because the admin's own playlists are re-rendered into this list
-     whenever they change — handlers bound per button would die with the nodes. */
-  on(qs('#side-playlists'), 'click', (e) => {
-    const btn = e.target.closest('[data-filter]');
-    if (btn) player.setFilter(btn.dataset.filter);
-  });
+  /* the playlist list and its create button live in ui/sidebar.js */
+  initSidebarPlaylists();
 
   /* list ⇄ grid */
   const segs = qsa('.seg__btn[data-view]');

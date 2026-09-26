@@ -14,6 +14,9 @@ import { CATALOG, GENRES } from './tracks.js';
 const KEY = 'sonora.admin.v1';
 const SESSION_KEY = 'sonora.admin.session';
 
+/** Glyphs a playlist may carry — all of them already in the sprite. */
+export const PLAYLIST_ICONS = ['note', 'disc', 'wave', 'heart', 'queue', 'spark', 'list', 'grid'];
+
 /** Fields an admin may override on a shipped track. */
 const EDITABLE = [
   'title', 'artist', 'album', 'year', 'genre', 'genreKey',
@@ -73,6 +76,7 @@ function normalisePlaylists(list) {
     .map((p) => ({
       id: String(p.id || ''),
       name: String(p.name || 'Без названия'),
+      icon: PLAYLIST_ICONS.includes(p.icon) ? p.icon : 'note',
       trackIds: Array.isArray(p.trackIds) ? p.trackIds.filter((x) => typeof x === 'string') : [],
     }))
     .filter((p) => p.id);
@@ -392,13 +396,26 @@ class Admin {
     return `pl-${n}`;
   }
 
-  addPlaylist(name) {
+  addPlaylist(name, icon = 'note') {
     const clean = (name || '').trim();
     if (!clean) throw new Error('Дайте плейлисту название');
-    const playlist = { id: this.#nextPlaylistId(), name: clean.slice(0, 40), trackIds: [] };
+    const playlist = {
+      id: this.#nextPlaylistId(),
+      name: clean.slice(0, 40),
+      icon: PLAYLIST_ICONS.includes(icon) ? icon : 'note',
+      trackIds: [],
+    };
     this.#state.playlists.push(playlist);
     write(this.#state);
     return playlist;
+  }
+
+  setPlaylistIcon(id, icon) {
+    const pl = this.playlist(id);
+    if (!pl || !PLAYLIST_ICONS.includes(icon)) return null;
+    pl.icon = icon;
+    write(this.#state);
+    return pl;
   }
 
   renamePlaylist(id, name) {

@@ -17,7 +17,7 @@
 import { on, qs, qsa, plural } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
-import { admin } from '../data/admin.js';
+import { admin, PLAYLIST_ICONS } from '../data/admin.js';
 import { GENRES } from '../data/tracks.js';
 import { SCALES } from '../audio/synth.js';
 import { openSheet, closeSheet, initSheet } from './sheet.js';
@@ -506,27 +506,53 @@ function renderMusic() {
 
 /* ------------------------------- playlists ------------------------------- */
 
+/** A row of the sprite glyphs a playlist may carry; the chosen one is marked. */
+function iconPicker(current, onPick) {
+  const wrap = el('div', { class: 'adm-icons', role: 'radiogroup', 'aria-label': 'Иконка плейлиста' });
+  for (const name of PLAYLIST_ICONS) {
+    const b = el('button', {
+      class: `adm-icons__item${name === current ? ' is-active' : ''}`,
+      type: 'button',
+      role: 'radio',
+      'aria-checked': name === current ? 'true' : 'false',
+      title: name,
+      onclick: () => {
+        onPick(name);
+        for (const other of wrap.children) {
+          const on = other === b;
+          other.classList.toggle('is-active', on);
+          other.setAttribute('aria-checked', String(on));
+        }
+      },
+    });
+    b.append(icon(name, 17));
+    wrap.append(b);
+  }
+  return wrap;
+}
+
 /**
  * Create, rename, delete — and fill. Every playlist shows the whole shelf as
  * checkboxes, so filling one does not mean hunting for the right row first.
  */
 function buildPlaylists() {
-  const draft = { name: '' };
+  const draft = { name: '', icon: 'note' };
   const error = el('p', { class: 'adm-error', role: 'alert' });
   const tracks = admin.library();
 
   const create = el('div', { class: 'adm-add' }, [
     el('h3', { text: 'Новый плейлист' }),
+    el('p', { class: 'adm-note', text: 'Создать его можно и прямо в боковом меню — кнопкой «Создать плейлист». Здесь же выбирается иконка.' }),
     el('div', { class: 'adm-grid adm-grid--one' }, [
-      field('Название', input(draft.name, (v) => { draft.name = v; }, { placeholder: 'Для дороги', maxlength: '40' }),
-        'Плейлист появится в списке слева и откроет свою подборку.'),
+      field('Название', input(draft.name, (v) => { draft.name = v; }, { placeholder: 'Для дороги', maxlength: '40' })),
+      field('Иконка', iconPicker(draft.icon, (v) => { draft.icon = v; })),
     ]),
     error,
     el('div', { class: 'adm-add__row' }, [
       el('button', { class: 'primary-btn', type: 'button', text: 'Создать', onclick: () => {
         error.textContent = '';
         try {
-          admin.addPlaylist(draft.name);
+          admin.addPlaylist(draft.name, draft.icon);
           renderPlaylists();
           renderSidePlaylists();
           player.reconcile();

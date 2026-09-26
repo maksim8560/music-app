@@ -102,14 +102,11 @@
 
     <div class="sidebar__section">
       <p class="sidebar__label">Плейлисты</p>
-      <ul class="side-list" id="side-playlists">
-        <li><button class="side-list__item is-active" data-filter="all"><span class="side-list__dot" data-dot="all"></span>Все треки<em id="side-count-all">0</em></button></li>
-        <li><button class="side-list__item" data-filter="ambient"><span class="side-list__dot" data-dot="ambient"></span>Эмбиент</button></li>
-        <li><button class="side-list__item" data-filter="lofi"><span class="side-list__dot" data-dot="lofi"></span>Lo-Fi</button></li>
-        <li><button class="side-list__item" data-filter="electronic"><span class="side-list__dot" data-dot="electronic"></span>Электроника</button></li>
-        <li><button class="side-list__item" data-filter="neo"><span class="side-list__dot" data-dot="neo"></span>Неоклассика</button></li>
-        <li><button class="side-list__item" data-filter="local"><span class="side-list__dot" data-dot="local"></span>Загруженное<em id="side-count-local">0</em></button></li>
-      </ul>
+      <ul class="side-list" id="side-playlists"></ul>
+      <button class="side-list__add" id="btn-side-add-playlist">
+        <svg width="14" height="14" aria-hidden="true"><use href="#i-plus"/></svg>
+        Создать плейлист
+      </button>
     </div>
 
     <div class="sidebar__foot">

@@ -403,6 +403,38 @@
 /* ------------------------------ playlists ------------------------------- */
 .adm-stack { display: grid; gap: var(--gap-4); }
 
+.adm-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--bg-2) 70%, transparent);
+  align-content: flex-start;
+  min-height: 44px;
+}
+.adm-icons__item {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--d2) var(--ease), color var(--d2) var(--ease);
+}
+.adm-icons__item:hover { background: color-mix(in oklab, var(--text-1) 8%, transparent); color: var(--text-1); }
+.adm-icons__item.is-active {
+  color: var(--accent-ink);
+  background: var(--accent-a);
+  border-color: color-mix(in oklab, var(--accent-a) 60%, transparent);
+}
+.adm-icons__item svg { stroke: currentColor; fill: none; stroke-width: 1.6; }
+
 .adm-pl {
   display: grid;
   gap: var(--gap-3);

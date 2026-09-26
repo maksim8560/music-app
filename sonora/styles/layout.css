@@ -132,6 +132,43 @@
 
 .side-list { display: grid; gap: 1px; overflow-y: auto; }
 
+.side-list__empty {
+  padding: 7px 12px;
+  font-size: 0.875rem;
+  color: var(--text-4);
+}
+
+/* creating one from the rail, without a dialog */
+.side-list__add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 12px;
+  border-radius: var(--r-xs);
+  color: var(--text-3);
+  font-size: 0.875rem;
+  text-align: left;
+  white-space: nowrap;
+  transition: color var(--d1) var(--ease-soft), background var(--d1) var(--ease-soft);
+}
+.side-list__add:hover { color: var(--text); background: var(--fill-1); }
+.side-list__add svg { stroke: currentColor; fill: none; stroke-width: 1.7; }
+
+.side-list__new { padding: 2px 6px; }
+.side-list__new input {
+  width: 100%;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: color-mix(in oklab, var(--bg-2) 80%, transparent);
+  border: 1px solid var(--accent-a);
+  border-radius: var(--r-xs);
+  padding: 6px 8px;
+}
+.side-list__new input:focus-visible { outline: none; }
+
 .side-list__item {
   display: flex;
   align-items: center;
@@ -145,6 +182,7 @@
   white-space: nowrap;
   transition: color var(--d1) var(--ease-soft), background var(--d1) var(--ease-soft);
 }
+.side-list__item svg { flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; }
 
 .side-list__item:hover { color: var(--text); background: var(--fill-1); }
 

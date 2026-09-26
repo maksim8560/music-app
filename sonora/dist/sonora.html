@@ -500,6 +500,43 @@ kbd {
 
 .side-list { display: grid; gap: 1px; overflow-y: auto; }
 
+.side-list__empty {
+  padding: 7px 12px;
+  font-size: 0.875rem;
+  color: var(--text-4);
+}
+
+/* creating one from the rail, without a dialog */
+.side-list__add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 12px;
+  border-radius: var(--r-xs);
+  color: var(--text-3);
+  font-size: 0.875rem;
+  text-align: left;
+  white-space: nowrap;
+  transition: color var(--d1) var(--ease-soft), background var(--d1) var(--ease-soft);
+}
+.side-list__add:hover { color: var(--text); background: var(--fill-1); }
+.side-list__add svg { stroke: currentColor; fill: none; stroke-width: 1.7; }
+
+.side-list__new { padding: 2px 6px; }
+.side-list__new input {
+  width: 100%;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: color-mix(in oklab, var(--bg-2) 80%, transparent);
+  border: 1px solid var(--accent-a);
+  border-radius: var(--r-xs);
+  padding: 6px 8px;
+}
+.side-list__new input:focus-visible { outline: none; }
+
 .side-list__item {
   display: flex;
   align-items: center;
@@ -513,6 +550,7 @@ kbd {
   white-space: nowrap;
   transition: color var(--d1) var(--ease-soft), background var(--d1) var(--ease-soft);
 }
+.side-list__item svg { flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; }
 
 .side-list__item:hover { color: var(--text); background: var(--fill-1); }
 
@@ -2527,6 +2565,38 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
 /* ------------------------------ playlists ------------------------------- */
 .adm-stack { display: grid; gap: var(--gap-4); }
 
+.adm-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--bg-2) 70%, transparent);
+  align-content: flex-start;
+  min-height: 44px;
+}
+.adm-icons__item {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--d2) var(--ease), color var(--d2) var(--ease);
+}
+.adm-icons__item:hover { background: color-mix(in oklab, var(--text-1) 8%, transparent); color: var(--text-1); }
+.adm-icons__item.is-active {
+  color: var(--accent-ink);
+  background: var(--accent-a);
+  border-color: color-mix(in oklab, var(--accent-a) 60%, transparent);
+}
+.adm-icons__item svg { stroke: currentColor; fill: none; stroke-width: 1.6; }
+
 .adm-pl {
   display: grid;
   gap: var(--gap-3);
@@ -2698,14 +2768,11 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
 
     <div class="sidebar__section">
       <p class="sidebar__label">Плейлисты</p>
-      <ul class="side-list" id="side-playlists">
-        <li><button class="side-list__item is-active" data-filter="all"><span class="side-list__dot" data-dot="all"></span>Все треки<em id="side-count-all">0</em></button></li>
-        <li><button class="side-list__item" data-filter="ambient"><span class="side-list__dot" data-dot="ambient"></span>Эмбиент</button></li>
-        <li><button class="side-list__item" data-filter="lofi"><span class="side-list__dot" data-dot="lofi"></span>Lo-Fi</button></li>
-        <li><button class="side-list__item" data-filter="electronic"><span class="side-list__dot" data-dot="electronic"></span>Электроника</button></li>
-        <li><button class="side-list__item" data-filter="neo"><span class="side-list__dot" data-dot="neo"></span>Неоклассика</button></li>
-        <li><button class="side-list__item" data-filter="local"><span class="side-list__dot" data-dot="local"></span>Загруженное<em id="side-count-local">0</em></button></li>
-      </ul>
+      <ul class="side-list" id="side-playlists"></ul>
+      <button class="side-list__add" id="btn-side-add-playlist">
+        <svg width="14" height="14" aria-hidden="true"><use href="#i-plus"/></svg>
+        Создать плейлист
+      </button>
     </div>
 
     <div class="sidebar__foot">
@@ -4817,6 +4884,9 @@ const { CATALOG: CATALOG, GENRES: GENRES } = __req("scripts/data/tracks.js");
 const KEY = 'sonora.admin.v1';
 const SESSION_KEY = 'sonora.admin.session';
 
+/** Glyphs a playlist may carry — all of them already in the sprite. */
+const PLAYLIST_ICONS = ['note', 'disc', 'wave', 'heart', 'queue', 'spark', 'list', 'grid'];
+
 /** Fields an admin may override on a shipped track. */
 const EDITABLE = [
   'title', 'artist', 'album', 'year', 'genre', 'genreKey',
@@ -4876,6 +4946,7 @@ function normalisePlaylists(list) {
     .map((p) => ({
       id: String(p.id || ''),
       name: String(p.name || 'Без названия'),
+      icon: PLAYLIST_ICONS.includes(p.icon) ? p.icon : 'note',
       trackIds: Array.isArray(p.trackIds) ? p.trackIds.filter((x) => typeof x === 'string') : [],
     }))
     .filter((p) => p.id);
@@ -5195,13 +5266,26 @@ class Admin {
     return `pl-${n}`;
   }
 
-  addPlaylist(name) {
+  addPlaylist(name, icon = 'note') {
     const clean = (name || '').trim();
     if (!clean) throw new Error('Дайте плейлисту название');
-    const playlist = { id: this.#nextPlaylistId(), name: clean.slice(0, 40), trackIds: [] };
+    const playlist = {
+      id: this.#nextPlaylistId(),
+      name: clean.slice(0, 40),
+      icon: PLAYLIST_ICONS.includes(icon) ? icon : 'note',
+      trackIds: [],
+    };
     this.#state.playlists.push(playlist);
     write(this.#state);
     return playlist;
+  }
+
+  setPlaylistIcon(id, icon) {
+    const pl = this.playlist(id);
+    if (!pl || !PLAYLIST_ICONS.includes(icon)) return null;
+    pl.icon = icon;
+    write(this.#state);
+    return pl;
   }
 
   renamePlaylist(id, name) {
@@ -5320,7 +5404,7 @@ function clampNum(value, min, max, fallback) {
 
 const admin = new Admin();
 
-return { admin };
+return { PLAYLIST_ICONS, admin };
 });
 
 __mod("scripts/audio/files.js", function () {
@@ -6722,15 +6806,30 @@ return { renderLibrary, syncLibrary };
 __mod("scripts/ui/sidebar.js", function () {
 /* ==========================================================================
    ui/sidebar.js — the playlist list in the sidebar rail
-   The built-in entries (all, genres) live in the markup; the admin's own
-   playlists are rendered on top of them from the admin layer.
+   The admin's own playlists, and a button to make another one without leaving
+   the page. Nothing here is built in: the section is empty until the admin
+   creates something.
    ========================================================================== */
 
-const { qs: qs, qsa: qsa } = __req("scripts/core/dom.js");
+const { qs: qs } = __req("scripts/core/dom.js");
 const { store: store } = __req("scripts/core/store.js");
 const { admin: admin } = __req("scripts/data/admin.js");
+const { player: player } = __req("scripts/core/player.js");
+const { toast: toast } = __req("scripts/ui/toast.js");
 
 let signature = '';
+
+const svgIcon = (name, size = 14) => {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(ns, 'use');
+  use.setAttribute('href', `#i-${name}`);
+  svg.append(use);
+  return svg;
+};
 
 function renderSidePlaylists() {
   const list = qs('#side-playlists');
@@ -6739,26 +6838,31 @@ function renderSidePlaylists() {
   const mine = admin.playlists.map((p) => ({
     id: p.id,
     name: p.name,
+    icon: p.icon || 'note',
     count: p.trackIds.length,
   }));
   const sig = JSON.stringify(mine);
   if (sig === signature) return;
   signature = sig;
 
-  for (const li of [...list.children]) {
-    if (li.dataset.own) li.remove();
+  list.replaceChildren();
+  const filter = store.get('filter');
+
+  if (!mine.length) {
+    const li = document.createElement('li');
+    li.className = 'side-list__empty';
+    li.textContent = 'Пока пусто';
+    list.append(li);
+    return;
   }
 
-  const filter = store.get('filter');
   for (const p of mine) {
     const li = document.createElement('li');
-    li.dataset.own = '1';
-
     const btn = document.createElement('button');
-    btn.className = 'side-list__item';
+    btn.className = 'side-list__item side-list__item--own';
     btn.dataset.filter = `pl:${p.id}`;
     if (filter === `pl:${p.id}`) btn.classList.add('is-active');
-    btn.append(icon('queue'));
+    btn.append(svgIcon(p.icon));
     btn.append(document.createTextNode(p.name));
     if (p.count) {
       const em = document.createElement('em');
@@ -6768,27 +6872,71 @@ function renderSidePlaylists() {
     li.append(btn);
     list.append(li);
   }
-
-  /* the genre dots are styled per data-dot; the admin's entries get their own */
-  for (const b of qsa('#side-playlists [data-filter^="pl:"]')) {
-    b.classList.add('side-list__item--own');
-  }
 }
 
-/** Small inline glyph, kept local so this module has no drawing dependency. */
-function icon(name) {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('width', '14');
-  svg.setAttribute('height', '14');
-  svg.setAttribute('aria-hidden', 'true');
-  const use = document.createElementNS(ns, 'use');
-  use.setAttribute('href', `#i-${name}`);
-  svg.append(use);
-  return svg;
+/**
+ * Create a playlist from the rail. The name field appears in place rather than
+ * in a `prompt()`, so it can be cancelled with Escape and needs no dialog.
+ */
+function initSidebarPlaylists() {
+  const list = qs('#side-playlists');
+  const add = qs('#btn-side-add-playlist');
+  if (!list || !add) return;
+
+  let editor = null;
+
+  const closeEditor = () => {
+    editor?.remove();
+    editor = null;
+  };
+
+  const openEditor = () => {
+    if (editor) { editor.querySelector('input')?.focus(); return; }
+    const li = document.createElement('li');
+    li.className = 'side-list__new';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 40;
+    input.placeholder = 'Название плейлиста';
+    input.setAttribute('aria-label', 'Название плейлиста');
+    const commit = () => {
+      const name = input.value.trim();
+      if (!name) { closeEditor(); return; }
+      try {
+        admin.addPlaylist(name);
+        closeEditor();
+        renderSidePlaylists();
+        player.reconcile();
+        toast(`Плейлист «${name}» создан — наполните его в админ-панели`, 'ok', 4000);
+      } catch (err) {
+        toast(String(err.message || err), 'error');
+      }
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { e.preventDefault(); closeEditor(); }
+    });
+    input.addEventListener('blur', () => {
+      /* let Enter land first */
+      setTimeout(() => { if (input.value.trim()) commit(); else closeEditor(); }, 120);
+    });
+    li.append(input);
+    list.append(li);
+    editor = li;
+    input.focus();
+  };
+
+  add.addEventListener('click', openEditor);
+
+  /* clicking a playlist filters by it; the list is delegated because these
+     entries are re-rendered whenever the set changes */
+  list.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-filter]');
+    if (btn) player.setFilter(btn.dataset.filter);
+  });
 }
 
-return { renderSidePlaylists };
+return { renderSidePlaylists, initSidebarPlaylists };
 });
 
 __mod("scripts/ui/queue.js", function () {
@@ -7871,7 +8019,7 @@ __mod("scripts/ui/admin.js", function () {
 const { on: on, qs: qs, qsa: qsa, plural: plural } = __req("scripts/core/dom.js");
 const { store: store } = __req("scripts/core/store.js");
 const { player: player } = __req("scripts/core/player.js");
-const { admin: admin } = __req("scripts/data/admin.js");
+const { admin: admin, PLAYLIST_ICONS: PLAYLIST_ICONS } = __req("scripts/data/admin.js");
 const { GENRES: GENRES } = __req("scripts/data/tracks.js");
 const { SCALES: SCALES } = __req("scripts/audio/synth.js");
 const { openSheet: openSheet, closeSheet: closeSheet, initSheet: initSheet } = __req("scripts/ui/sheet.js");
@@ -8360,27 +8508,53 @@ function renderMusic() {
 
 /* ------------------------------- playlists ------------------------------- */
 
+/** A row of the sprite glyphs a playlist may carry; the chosen one is marked. */
+function iconPicker(current, onPick) {
+  const wrap = el('div', { class: 'adm-icons', role: 'radiogroup', 'aria-label': 'Иконка плейлиста' });
+  for (const name of PLAYLIST_ICONS) {
+    const b = el('button', {
+      class: `adm-icons__item${name === current ? ' is-active' : ''}`,
+      type: 'button',
+      role: 'radio',
+      'aria-checked': name === current ? 'true' : 'false',
+      title: name,
+      onclick: () => {
+        onPick(name);
+        for (const other of wrap.children) {
+          const on = other === b;
+          other.classList.toggle('is-active', on);
+          other.setAttribute('aria-checked', String(on));
+        }
+      },
+    });
+    b.append(icon(name, 17));
+    wrap.append(b);
+  }
+  return wrap;
+}
+
 /**
  * Create, rename, delete — and fill. Every playlist shows the whole shelf as
  * checkboxes, so filling one does not mean hunting for the right row first.
  */
 function buildPlaylists() {
-  const draft = { name: '' };
+  const draft = { name: '', icon: 'note' };
   const error = el('p', { class: 'adm-error', role: 'alert' });
   const tracks = admin.library();
 
   const create = el('div', { class: 'adm-add' }, [
     el('h3', { text: 'Новый плейлист' }),
+    el('p', { class: 'adm-note', text: 'Создать его можно и прямо в боковом меню — кнопкой «Создать плейлист». Здесь же выбирается иконка.' }),
     el('div', { class: 'adm-grid adm-grid--one' }, [
-      field('Название', input(draft.name, (v) => { draft.name = v; }, { placeholder: 'Для дороги', maxlength: '40' }),
-        'Плейлист появится в списке слева и откроет свою подборку.'),
+      field('Название', input(draft.name, (v) => { draft.name = v; }, { placeholder: 'Для дороги', maxlength: '40' })),
+      field('Иконка', iconPicker(draft.icon, (v) => { draft.icon = v; })),
     ]),
     error,
     el('div', { class: 'adm-add__row' }, [
       el('button', { class: 'primary-btn', type: 'button', text: 'Создать', onclick: () => {
         error.textContent = '';
         try {
-          admin.addPlaylist(draft.name);
+          admin.addPlaylist(draft.name, draft.icon);
           renderPlaylists();
           renderSidePlaylists();
           player.reconcile();
@@ -9028,7 +9202,7 @@ const { store: store } = __req("scripts/core/store.js");
 const { player: player } = __req("scripts/core/player.js");
 const { engine: engine } = __req("scripts/audio/engine.js");
 const { renderLibrary: renderLibrary, syncLibrary: syncLibrary } = __req("scripts/ui/library.js");
-const { renderSidePlaylists: renderSidePlaylists } = __req("scripts/ui/sidebar.js");
+const { renderSidePlaylists: renderSidePlaylists, initSidebarPlaylists: initSidebarPlaylists } = __req("scripts/ui/sidebar.js");
 const { renderQueue: renderQueue } = __req("scripts/ui/queue.js");
 const { initTransport: initTransport, syncTrack: syncTrack, syncState: syncState, syncVolume: syncVolume, syncLike: syncLike } = __req("scripts/ui/transport.js");
 const { initPalette: initPalette, open: openPalette, paletteShortcut: paletteShortcut } = __req("scripts/ui/palette.js");
@@ -9108,11 +9282,7 @@ function flush() {
    Counters
    ========================================================================== */
 function updateCounters() {
-  const all = qs('#side-count-all');
-  const local = qs('#side-count-local');
   const likes = qs('#nav-like-count');
-  if (all) all.textContent = String(player.ordered().length);
-  if (local) local.textContent = String(player.localTracks.length);
   if (likes) likes.textContent = String((store.get('likes') || []).length);
 }
 
@@ -9155,12 +9325,8 @@ function initNav() {
     });
   });
 
-  /* Delegated, because the admin's own playlists are re-rendered into this list
-     whenever they change — handlers bound per button would die with the nodes. */
-  on(qs('#side-playlists'), 'click', (e) => {
-    const btn = e.target.closest('[data-filter]');
-    if (btn) player.setFilter(btn.dataset.filter);
-  });
+  /* the playlist list and its create button live in ui/sidebar.js */
+  initSidebarPlaylists();
 
   /* list ⇄ grid */
   const segs = qsa('.seg__btn[data-view]');
