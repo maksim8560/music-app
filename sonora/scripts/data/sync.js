@@ -274,9 +274,26 @@ export async function testSync() {
       : 'Доступ есть, файл ещё не создан');
     return true;
   } catch (err) {
-    set('error', String(err.message || err));
+    fail(err);
     return false;
   }
+}
+
+/**
+ * Is the token that is stored here still accepted?
+ *
+ * Worth asking before the panel opens, because a token that has been revoked
+ * is indistinguishable from a working one until something is written: the
+ * panel opens, the shelf is there, and the save quietly does nothing. The
+ * check is nearly free - the file is read anyway - and GitHub rejects an
+ * invalid Authorization header even on a public file, which is what makes the
+ * answer trustworthy rather than "the read worked, so the token is fine".
+ */
+export async function verifyToken() {
+  if (!remoteWritable()) return false;
+  const ok = await testSync();
+  /* a dead network says nothing about the token, so only a refusal counts */
+  return ok || !authFailed;
 }
 
 /** Forget the token. Reading keeps working: a public file needs none. */

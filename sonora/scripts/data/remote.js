@@ -54,6 +54,18 @@ export function remoteConfig() {
   }
 }
 
+/**
+ * Drop the token but keep where it points.
+ *
+ * Used when GitHub refuses the stored one. Wiping the whole configuration would
+ * throw away the repository and path along with it, and those were not the
+ * thing that stopped working - the owner would be re-typing settings that were
+ * perfectly correct, on top of the token they actually came for.
+ */
+export function forgetToken() {
+  saveRemoteConfig({ token: '' });
+}
+
 export function saveRemoteConfig(patch) {
   const next = { ...remoteConfig(), ...patch };
   localStorage.setItem(CONFIG_KEY, JSON.stringify(next));
@@ -173,7 +185,17 @@ export async function fetchRemote({ etag = '' } = {}) {
       : `GitHub временно не отдаёт каталог: закончились запросы на час.${hint}`);
   }
   if (res.status === 401 || res.status === 403) {
-    throw new Error('GitHub не пустил. Если репозиторий приватный — вставьте токен, если публичный — проверьте имя и ветку.');
+    /* A stored token that GitHub refuses is a different situation from a
+       missing one, and the panel has to be able to tell them apart: a revoked
+       token needs a new one typed in, a missing one needs typing in the first
+       place. Note that a public file reads fine without any token at all, so
+       it is the rejected Authorization header - not the failed read - that
+       makes this an answer about the token. */
+    const err = new Error(cfg.token
+      ? 'GitHub отклонил сохранённый токен — он отозван или истёк.'
+      : 'GitHub не пустил. Если репозиторий приватный — вставьте токен, если публичный — проверьте имя и ветку.');
+    if (cfg.token) err.auth = true;
+    throw err;
   }
   if (!res.ok) throw new Error(`GitHub ответил ${res.status}`);
   const data = await res.json();

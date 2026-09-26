@@ -101,7 +101,7 @@ class Player {
     if (!query) return true;
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return [track.title, track.artist, track.album, track.genre, String(track.year)]
+    return [track.title, track.artist, track.album, String(track.year)]
       .filter(Boolean)
       .some((field) => field.toLowerCase().includes(q));
   }
@@ -119,7 +119,9 @@ class Player {
       const pl = admin.playlist(filter.slice(3));
       const ids = new Set(pl?.trackIds || []);
       list = list.filter((t) => ids.has(t.id));
-    } else if (filter && filter !== 'all') list = list.filter((t) => t.genreKey === filter);
+    } else if (filter === 'local') {
+      list = list.filter((t) => t.source === 'file' || t.source === 'gen');
+    }
 
     if (search) list = list.filter((t) => this.matches(t, search));
     return list;

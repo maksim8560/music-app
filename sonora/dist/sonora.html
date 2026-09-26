@@ -2629,80 +2629,6 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
   border-top: 1px solid var(--glass-line);
 }
 
-.adm-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: none;
-  background: var(--dot, var(--text-3));
-}
-.adm-dot--ambient { --dot: #7c8cff; }
-.adm-dot--lofi { --dot: #ffb26b; }
-.adm-dot--electronic { --dot: #63f5d2; }
-.adm-dot--neo { --dot: #d79bff; }
-.adm-dot--local { --dot: var(--text-3); }
-.adm-dot--new { border: 1px dashed var(--text-3); background: none; }
-
-/* ---------------------------------- genres -------------------------------- */
-/* A genre the admin made has a colour of its own, applied inline, so these
-   rows need no per-genre class. */
-.adm-block {
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background: var(--fill-1);
-  overflow: hidden;
-}
-.adm-block__head {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-2);
-  padding: 12px 14px;
-}
-.adm-block__head h3 { flex: 1; font-size: 0.95rem; }
-.adm-block__count {
-  font-size: 0.78rem;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-}
-.adm-genres {
-  display: grid;
-  gap: 6px;
-  padding: 0 14px 14px;
-}
-.adm-genre {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-2);
-}
-.adm-genre .adm-input { flex: 1; min-width: 0; }
-.adm-genre--new { padding-top: 6px; border-top: 1px solid var(--line); margin-top: 4px; }
-.adm-genre__swatch {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  flex: none;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  cursor: pointer;
-}
-.adm-genre__swatch input[type="color"] {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-.adm-genre__pick { width: 22px; height: 22px; padding: 0; border: 0; background: none; cursor: pointer; }
-.adm-genre__swatch:hover { border-color: var(--accent-a); }
-.adm-hint { font-size: 0.8rem; color: var(--text-3); line-height: 1.5; }
-
-@media (pointer: coarse) {
-  .adm-genre__swatch { width: 44px; height: 44px; }
-  .adm-genre__swatch input[type="color"] { width: 28px; height: 28px; }
-}
-
 .adm-url code {
   display: block;
   overflow: hidden;
@@ -3007,7 +2933,7 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
     <header class="topbar glass" role="search">
       <div class="search">
         <svg width="17" height="17" class="search__icon"><use href="#i-search"/></svg>
-        <input id="search" type="search" placeholder="Поиск по трекам, альбомам, жанрам" autocomplete="off" spellcheck="false" aria-label="Поиск">
+        <input id="search" type="search" placeholder="Поиск по трекам и альбомам" autocomplete="off" spellcheck="false" aria-label="Поиск">
         <button class="search__clear" id="search-clear" aria-label="Очистить поиск" hidden><svg width="15" height="15"><use href="#i-close"/></svg></button>
         <kbd class="search__kbd">/</kbd>
       </div>
@@ -5062,13 +4988,9 @@ __mod("scripts/data/tracks.js", function () {
    player ships with real, endless music and zero binary assets.
    ========================================================================== */
 
-const GENRES = {
-  ambient: { label: 'Эмбиент', dot: 'ambient' },
-  lofi: { label: 'Lo-Fi', dot: 'lofi' },
-  electronic: { label: 'Электроника', dot: 'electronic' },
-  neo: { label: 'Неоклассика', dot: 'neo' },
-  local: { label: 'Загруженное', dot: 'local' },
-};
+/* There is no genre here, and that is deliberate: it was a fixed list of five
+   the admin could rename but not replace, and a field every track had to be
+   filed under. A track is a file or a live stream, and the badge says which. */
 
 
 /* --------------------------------------------------------------------------
@@ -5081,7 +5003,7 @@ const GENRES = {
    -------------------------------------------------------------------------- */
 const CATALOG = [];
 
-return { GENRES, CATALOG };
+return { CATALOG };
 });
 
 __mod("scripts/data/admin.js", function () {
@@ -5096,7 +5018,7 @@ __mod("scripts/data/admin.js", function () {
    It is deliberately not a security boundary and the panel says so.
    ========================================================================== */
 
-const { CATALOG: CATALOG, GENRES: GENRES } = __req("scripts/data/tracks.js");
+const { CATALOG: CATALOG } = __req("scripts/data/tracks.js");
 
 const KEY = 'sonora.admin.v1';
 const SESSION_KEY = 'sonora.admin.session';
@@ -5106,7 +5028,7 @@ const PLAYLIST_ICONS = ['note', 'disc', 'wave', 'heart', 'queue', 'spark', 'list
 
 /** Fields an admin may override on a shipped track. */
 const EDITABLE = [
-  'title', 'artist', 'album', 'year', 'genre', 'genreKey',
+  'title', 'artist', 'album', 'year',
   'duration', 'bpm', 'root', 'scale', 'blurb', 'mood', 'seed', 'colors',
   'coverUrl', 'url',
 ];
@@ -5150,67 +5072,8 @@ const DEFAULTS = () => ({
   custom: [],
   /* the admin's own playlists: [{ id, name, trackIds }] */
   playlists: [],
-  /* the admin's own genres, on top of the built-in ones: [{ key, label, color }] */
-  genres: [],
   updatedAt: 0,
 });
-
-/** Colours a new genre can be given, so the rail stays readable. */
-const GENRE_COLORS = [
-  '#7c8cff', '#63f5d2', '#ffb26b', '#d79bff', '#ff6b81', '#6bd3ff',
-  '#a8e06a', '#f5a3d0', '#ffd166', '#8de0c0', '#c4a7ff', '#ff9f7a',
-];
-
-/** The built-in genres, kept always available and used as the seed. */
-const BUILTIN_GENRES = Object.entries(GENRES).map(([key, g], i) => ({
-  key,
-  label: g.label,
-  color: GENRE_COLORS[i % GENRE_COLORS.length],
-  builtin: true,
-}));
-
-/**
- * A key has to survive a `data-filter`, a CSS class and a query string, so it
- * stays latin and lowercase even when the name is written in Cyrillic.
- */
-const TRANSLIT = {
-  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z',
-  и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
-  с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch',
-  ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
-};
-
-function slugify(text) {
-  return String(text || '')
-    .toLowerCase()
-    .replace(/[а-яё]/g, (ch) => TRANSLIT[ch] ?? ch)
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 24);
-}
-
-/**
- * The genres the admin made. Built-in ones are never stored - they are always
- * there - so this list only holds what was added on top, and renaming a
- * built-in works by shadowing its label.
- */
-function normaliseGenres(list) {
-  if (!Array.isArray(list)) return [];
-  const out = [];
-  const keys = new Set();
-  for (const g of list) {
-    if (!g || typeof g !== 'object') continue;
-    const key = String(g.key || '').trim().toLowerCase();
-    if (!key || keys.has(key)) continue;
-    keys.add(key);
-    out.push({
-      key,
-      label: String(g.label || g.key).slice(0, 40),
-      color: /^#[0-9a-f]{6}$/i.test(g.color || '') ? g.color : GENRE_COLORS[out.length % GENRE_COLORS.length],
-    });
-  }
-  return out;
-}
 
 /** Older saves have no playlists; keep the shape honest on the way in. */
 function normalisePlaylists(list) {
@@ -5242,7 +5105,6 @@ function read() {
       hidden: Array.isArray(saved.hidden) ? saved.hidden : [],
       custom: Array.isArray(saved.custom) ? saved.custom : [],
       playlists: normalisePlaylists(saved.playlists),
-      genres: normaliseGenres(saved.genres),
     };
     /* A password hash from before it was removed. It is worthless - it sat
        next to the token the whole time - but leaving it in place would keep
@@ -5346,8 +5208,6 @@ class Admin {
     for (const key of EDITABLE) {
       if (key in patch && patch[key] !== undefined && patch[key] !== null) clean[key] = patch[key];
     }
-    /* the admin's own genres count, so a track may be filed under one of them */
-    if (clean.genreKey && !this.genre(clean.genreKey)) delete clean.genreKey;
     if ('coverUrl' in clean) clean.coverUrl = safeImage(clean.coverUrl);
     const custom = this.#state.custom.find((t) => t.id === id);
     if (custom) {
@@ -5397,15 +5257,12 @@ class Admin {
   /** A hand-built generative track, modelled on the shipped ones. */
   addGenerative(partial = {}) {
     const id = this.#nextId('admin');
-    const genreKey = this.genre(partial.genreKey) ? partial.genreKey : 'ambient';
     const track = {
       id,
       title: partial.title?.trim() || 'Без названия',
       artist: partial.artist?.trim() || 'Неизвестный исполнитель',
       album: partial.album?.trim() || 'Своя подборка',
       year: Number(partial.year) || new Date().getFullYear(),
-      genre: partial.genre?.trim() || this.genreLabel(genreKey),
-      genreKey,
       duration: clampNum(partial.duration, 60, 3600, 210),
       bpm: clampNum(partial.bpm, 40, 200, 84),
       root: clampNum(partial.root, 24, 84, 45),
@@ -5431,7 +5288,7 @@ class Admin {
    * is endless, so it can never be downloaded — it plays through an <audio>
    * element instead, which works cross-origin but has no length to seek in.
    */
-  addUrl({ url, title, artist, album, blurb, cover, genreKey = 'local', kind = 'file' }) {
+  addUrl({ url, title, artist, album, blurb, cover, kind = 'file' }) {
     const clean = (url || '').trim();
     if (!/^https?:\/\/\S+$/i.test(clean)) throw new Error('Нужна ссылка http:// или https://');
     const live = kind === 'stream';
@@ -5441,10 +5298,6 @@ class Admin {
       artist: artist?.trim() || (live ? 'Радио' : 'По ссылке'),
       album: album?.trim() || (live ? 'Эфир' : 'Ссылки'),
       year: new Date().getFullYear(),
-      /* an unknown key must not leak into the label: a track called "дарквейв"
-         under the raw key reads like a bug, not like a genre */
-      genre: live ? 'Радио' : (this.genre(genreKey) ? this.genreLabel(genreKey) : this.genreLabel('local')),
-      genreKey: live ? 'local' : (this.genre(genreKey) ? genreKey : 'local'),
       /* 0 until a file is fetched and decoded — the clock fills in then. A
          stream has no length at all, and 0 is how the transport reads that. */
       duration: 0,
@@ -5537,96 +5390,6 @@ class Admin {
     return this.#state.playlists;
   }
 
-  /* ------------------------------- genres -------------------------------- */
-
-  /**
-   * Every genre available to a track: the built-in five, plus whatever the
-   * admin added, plus any label the admin gave a built-in key. Renaming a
-   * built-in shadows its label rather than forking it, so old tracks keep
-   * working and nothing is duplicated in the dropdown.
-   */
-  genres() {
-    const out = BUILTIN_GENRES.map((g) => ({ ...g }));
-    for (const g of this.#state.genres) {
-      const found = out.find((x) => x.key === g.key);
-      if (found) Object.assign(found, { label: g.label, color: g.color, custom: true, builtin: false });
-      else out.push({ ...g, custom: true });
-    }
-    return out;
-  }
-
-  genre(key) {
-    return this.genres().find((g) => g.key === key) || null;
-  }
-
-  genreLabel(key) {
-    return this.genre(key)?.label || key || '';
-  }
-
-  genreColor(key) {
-    return this.genre(key)?.color || GENRE_COLORS[0];
-  }
-
-  addGenre(label, color) {
-    const clean = (label || '').trim();
-    if (!clean) throw new Error('Дайте жанру название');
-    /* by name, not by key: "Дарквейв" and "дарквейв" are the same genre, and a
-       transliterated key would happily make them look like two */
-    const clash = this.genres().find((g) => g.label.trim().toLowerCase() === clean.toLowerCase());
-    if (clash) throw new Error(`Жанр «${clash.label}» уже есть`);
-    const taken = new Set(this.genres().map((g) => g.key));
-    let key = slugify(clean);
-    if (!key) key = `genre-${this.#state.genres.length + 1}`;
-    if (taken.has(key)) {
-      let n = 2;
-      while (taken.has(`${key}-${n}`)) n++;
-      key = `${key}-${n}`;
-    }
-    const genre = {
-      key,
-      label: clean.slice(0, 40),
-      color: /^#[0-9a-f]{6}$/i.test(color || '') ? color : GENRE_COLORS[this.#state.genres.length % GENRE_COLORS.length],
-    };
-    this.#state.genres.push(genre);
-    write(this.#state);
-    return genre;
-  }
-
-  renameGenre(key, label, color) {
-    const clean = (label || '').trim();
-    if (!clean) throw new Error('Дайте жанру название');
-    const mine = this.#state.genres.find((g) => g.key === key);
-    if (mine) {
-      mine.label = clean.slice(0, 40);
-      if (/^#[0-9a-f]{6}$/i.test(color || '')) mine.color = color;
-    } else if (BUILTIN_GENRES.some((g) => g.key === key)) {
-      /* a built-in, shadowed so the new name follows it everywhere */
-      this.#state.genres.push({
-        key,
-        label: clean.slice(0, 40),
-        color: /^#[0-9a-f]{6}$/i.test(color || '') ? color : this.genreColor(key),
-      });
-    } else {
-      return null;
-    }
-    /* tracks that only carried the key must learn the new name */
-    for (const t of this.#state.custom) {
-      if (t.genreKey === key) t.genre = clean.slice(0, 40);
-    }
-    write(this.#state);
-    return this.genre(key);
-  }
-
-  /**
-   * Remove a genre. Tracks keep playing - they fall back to the key as their
-   * label - because deleting a shelf must not take the music with it.
-   */
-  removeGenre(key) {
-    this.#state.genres = this.#state.genres.filter((g) => g.key !== key);
-    write(this.#state);
-    return this.genres();
-  }
-
   /** Put a track in a playlist, or take it out. @returns {boolean} now in it */
   setInPlaylist(playlistId, trackId, on) {
     const pl = this.playlist(playlistId);
@@ -5666,8 +5429,6 @@ class Admin {
       if (custom.source === source) return;
       custom.source = source;
       if (source === 'stream') {
-        custom.genre = this.genreLabel('local');
-        custom.genreKey = 'local';
         custom.duration = 0;
       }
       write(this.#state);
@@ -5718,15 +5479,6 @@ class Admin {
       if (!seen.has(p.id)) playlists.push(p); // mine, not in the file yet
     }
 
-    /* Genres merge the same way: the file's version of a key wins, a genre
-       that exists only here is kept so the file does not delete it either. */
-    const genreKeys = new Set();
-    const genres = normaliseGenres(doc.genres);
-    for (const g of genres) genreKeys.add(g.key);
-    for (const g of this.#state.genres) {
-      if (!genreKeys.has(g.key)) genres.push(g);
-    }
-
     this.#state = {
       ...this.#state,
       site: { ...DEFAULTS().site, ...(doc.site || {}) },
@@ -5734,7 +5486,6 @@ class Admin {
       hidden: Array.isArray(doc.hidden) ? doc.hidden.filter((x) => typeof x === 'string') : [],
       custom: [...byId.values()],
       playlists,
-      genres,
     };
     this.prunePlaylists();
     write(this.#state);
@@ -5792,7 +5543,7 @@ function clampNum(value, min, max, fallback) {
 
 const admin = new Admin();
 
-return { PLAYLIST_ICONS, GENRE_COLORS, admin };
+return { PLAYLIST_ICONS, admin };
 });
 
 __mod("scripts/audio/files.js", function () {
@@ -5951,8 +5702,6 @@ async function makeLocalTrack(file) {
     artist,
     album: tags.album || 'Загруженные файлы',
     year: mpegYear || new Date(file.lastModified).getFullYear(),
-    genre: 'Локальный',
-    genreKey: 'local',
     duration: 0, // filled in after decoding
     colors: [c1, c2],
     blurb: `${file.name} · ${(file.size / 1048576).toFixed(1)} МБ`,
@@ -6383,7 +6132,7 @@ class Player {
     if (!query) return true;
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return [track.title, track.artist, track.album, track.genre, String(track.year)]
+    return [track.title, track.artist, track.album, String(track.year)]
       .filter(Boolean)
       .some((field) => field.toLowerCase().includes(q));
   }
@@ -6401,7 +6150,9 @@ class Player {
       const pl = admin.playlist(filter.slice(3));
       const ids = new Set(pl?.trackIds || []);
       list = list.filter((t) => ids.has(t.id));
-    } else if (filter && filter !== 'all') list = list.filter((t) => t.genreKey === filter);
+    } else if (filter === 'local') {
+      list = list.filter((t) => t.source === 'file' || t.source === 'gen');
+    }
 
     if (search) list = list.filter((t) => this.matches(t, search));
     return list;
@@ -6978,6 +6729,18 @@ function remoteConfig() {
   }
 }
 
+/**
+ * Drop the token but keep where it points.
+ *
+ * Used when GitHub refuses the stored one. Wiping the whole configuration would
+ * throw away the repository and path along with it, and those were not the
+ * thing that stopped working - the owner would be re-typing settings that were
+ * perfectly correct, on top of the token they actually came for.
+ */
+function forgetToken() {
+  saveRemoteConfig({ token: '' });
+}
+
 function saveRemoteConfig(patch) {
   const next = { ...remoteConfig(), ...patch };
   localStorage.setItem(CONFIG_KEY, JSON.stringify(next));
@@ -7097,7 +6860,17 @@ async function fetchRemote({ etag = '' } = {}) {
       : `GitHub временно не отдаёт каталог: закончились запросы на час.${hint}`);
   }
   if (res.status === 401 || res.status === 403) {
-    throw new Error('GitHub не пустил. Если репозиторий приватный — вставьте токен, если публичный — проверьте имя и ветку.');
+    /* A stored token that GitHub refuses is a different situation from a
+       missing one, and the panel has to be able to tell them apart: a revoked
+       token needs a new one typed in, a missing one needs typing in the first
+       place. Note that a public file reads fine without any token at all, so
+       it is the rejected Authorization header - not the failed read - that
+       makes this an answer about the token. */
+    const err = new Error(cfg.token
+      ? 'GitHub отклонил сохранённый токен — он отозван или истёк.'
+      : 'GitHub не пустил. Если репозиторий приватный — вставьте токен, если публичный — проверьте имя и ветку.');
+    if (cfg.token) err.auth = true;
+    throw err;
   }
   if (!res.ok) throw new Error(`GitHub ответил ${res.status}`);
   const data = await res.json();
@@ -7165,7 +6938,7 @@ function isAuthError(err) {
   return Boolean(err && err.auth);
 }
 
-return { remoteConfig, saveRemoteConfig, remoteReadable, remoteWritable, fetchRemote, pushRemote, checkRemote, isAuthError };
+return { remoteConfig, forgetToken, saveRemoteConfig, remoteReadable, remoteWritable, fetchRemote, pushRemote, checkRemote, isAuthError };
 });
 
 __mod("scripts/data/sync.js", function () {
@@ -7445,9 +7218,26 @@ async function testSync() {
       : 'Доступ есть, файл ещё не создан');
     return true;
   } catch (err) {
-    set('error', String(err.message || err));
+    fail(err);
     return false;
   }
+}
+
+/**
+ * Is the token that is stored here still accepted?
+ *
+ * Worth asking before the panel opens, because a token that has been revoked
+ * is indistinguishable from a working one until something is written: the
+ * panel opens, the shelf is there, and the save quietly does nothing. The
+ * check is nearly free - the file is read anyway - and GitHub rejects an
+ * invalid Authorization header even on a public file, which is what makes the
+ * answer trustworthy rather than "the read worked, so the token is fine".
+ */
+async function verifyToken() {
+  if (!remoteWritable()) return false;
+  const ok = await testSync();
+  /* a dead network says nothing about the token, so only a refusal counts */
+  return ok || !authFailed;
 }
 
 /** Forget the token. Reading keeps working: a public file needs none. */
@@ -7461,7 +7251,7 @@ function disableSync() {
 /* the play state is the one thing worth keeping out of the shared document */
 const isShared = () => remoteReadable();
 
-return { status, onSyncChange, initSync, hasLocalOnly, startWatch, markDirty, syncNow, testSync, disableSync, isShared };
+return { status, onSyncChange, initSync, hasLocalOnly, startWatch, markDirty, syncNow, testSync, verifyToken, disableSync, isShared };
 });
 
 __mod("scripts/ui/library.js", function () {
@@ -7475,7 +7265,6 @@ const { el: el, icon: icon, fmtTime: fmtTime, plural: plural, on: on } = __req("
 const { store: store } = __req("scripts/core/store.js");
 const { player: player } = __req("scripts/core/player.js");
 const { art: art } = __req("scripts/ui/artwork.js");
-const { GENRES: GENRES } = __req("scripts/data/tracks.js");
 const { admin: admin } = __req("scripts/data/admin.js");
 const { status: syncStatus, onSyncChange: onSyncChange } = __req("scripts/data/sync.js");
 const { toast: toast } = __req("scripts/ui/toast.js");
@@ -7508,7 +7297,6 @@ function buildRow(track, index) {
     num,
   );
 
-  const genre = GENRES[track.genreKey]?.label ?? track.genre;
   const meta = el('div', { class: 'track__meta' },
     el('div', { class: 'track__title', text: track.title }),
     el('div', { class: 'track__sub' },
@@ -7521,7 +7309,8 @@ function buildRow(track, index) {
   );
 
   const tail = el('div', { class: 'track__tail' },
-    el('span', { class: `track__badge${track.source === 'file' ? ' track__badge--local' : ''}`, text: track.source === 'file' ? 'Файл' : genre }),
+    /* what kind of thing this is, since there is no genre to say it */
+    el('span', { class: `track__badge${track.source === 'file' ? ' track__badge--local' : ''}`, text: track.source === 'file' ? 'Файл' : 'Радио' }),
     el('span', { class: 'track__time', text: track.duration ? fmtTime(track.duration) : '—:—' }),
   );
 
@@ -7648,7 +7437,7 @@ function headingFor(filter, search) {
     liked: 'Избранное',
     recent: 'Недавнее',
     local: 'Загруженное',
-  }[filter] || GENRES[filter]?.label || 'Все треки';
+  }[filter] || 'Все треки';
 }
 
 /**
@@ -8055,8 +7844,6 @@ const { player: player } = __req("scripts/core/player.js");
 const { engine: engine } = __req("scripts/audio/engine.js");
 const { art: art } = __req("scripts/ui/artwork.js");
 const { addTask: addTask } = __req("scripts/core/raf.js");
-const { GENRES: GENRES } = __req("scripts/data/tracks.js");
-
 const $ = (id) => document.getElementById(id);
 
 const dom = {
@@ -8135,13 +7922,12 @@ function syncTrack() {
 
   swapText(dom.title, track.title);
   swapText(dom.artist, track.artist);
-  dom.meta.textContent = `${track.genre} · ${track.album} · ${track.year}`;
+  dom.meta.textContent = `${track.album} · ${track.year}`;
   dom.note.textContent = track.blurb || '';
   /* no description — leave no empty paragraph behind the title */
   dom.note.hidden = !track.blurb;
 
-  const genreLabel = GENRES[track.genreKey]?.label ?? track.genre;
-  dom.badge.querySelector('span').textContent = store.get('playing') ? 'Сейчас играет' : genreLabel;
+  dom.badge.querySelector('span').textContent = store.get('playing') ? 'Сейчас играет' : 'Пауза';
 
   art.paint(dom.heroArt, track);
   art.paint(dom.barArt, track);
@@ -8293,10 +8079,11 @@ function updateClock() {
     dom.barDur.dateTime = live ? '' : `PT${Math.round(duration)}S`;
   }
 
-  /* the hero badge flips back to the genre when paused */
+  /* the hero badge says what it is doing, since there is no genre to fall back
+     to when it is not playing */
   const track = player.current;
   if (track) {
-    const label = store.get('playing') ? 'Сейчас играет' : (GENRES[track.genreKey]?.label ?? track.genre);
+    const label = store.get('playing') ? 'Сейчас играет' : 'Пауза';
     if (badgeLabel !== label) {
       badgeLabel = label;
       badgeSpan.textContent = label;
@@ -8416,7 +8203,6 @@ const { el: el, icon: icon, fuzzy: fuzzy, esc: esc, on: on } = __req("scripts/co
 const { store: store } = __req("scripts/core/store.js");
 const { player: player } = __req("scripts/core/player.js");
 const { art: art } = __req("scripts/ui/artwork.js");
-const { GENRES: GENRES } = __req("scripts/data/tracks.js");
 
 const root = document.getElementById('palette');
 const input = document.getElementById('palette-input');
@@ -8440,12 +8226,7 @@ const actions = () => [
   { id: 'import', title: 'Загрузить аудиофайлы…', icon: 'upload', run: () => document.getElementById('file-input').click() },
   { id: 'liked', title: 'Фильтр: избранное', icon: 'heart', run: () => player.setFilter('liked') },
   { id: 'recent', title: 'Фильтр: недавнее', icon: 'note', run: () => player.setFilter('recent') },
-  ...Object.entries(GENRES).map(([key, g]) => ({
-    id: `filter-${key}`,
-    title: `Фильтр: ${g.label.toLowerCase()}`,
-    icon: 'disc',
-    run: () => player.setFilter(key),
-  })),
+  { id: 'local', title: 'Фильтр: загруженное', icon: 'upload', run: () => player.setFilter('local') },
   { id: 'all', title: 'Фильтр: все треки', icon: 'grid', run: () => player.setFilter('all') },
   { id: 'settings', title: 'Настройки звука и интерфейса', icon: 'sliders', hint: ',', run: () => openSettingsSheet() },
   { id: 'theme', title: 'Сменить тему', icon: document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon', run: () => document.getElementById('btn-theme').click() },
@@ -8997,11 +8778,10 @@ __mod("scripts/ui/admin.js", function () {
 const { on: on, qs: qs, qsa: qsa, plural: plural } = __req("scripts/core/dom.js");
 const { store: store } = __req("scripts/core/store.js");
 const { player: player } = __req("scripts/core/player.js");
-const { admin: admin, PLAYLIST_ICONS: PLAYLIST_ICONS, GENRE_COLORS: GENRE_COLORS } = __req("scripts/data/admin.js");
-const { remoteConfig: remoteConfig, saveRemoteConfig: saveRemoteConfig } = __req("scripts/data/remote.js");
-const { onSyncChange: onSyncChange, syncNow: syncNow, testSync: testSync, disableSync: disableSync, markDirty: markDirty, status: status } = __req("scripts/data/sync.js");
+const { admin: admin, PLAYLIST_ICONS: PLAYLIST_ICONS } = __req("scripts/data/admin.js");
+const { remoteConfig: remoteConfig, saveRemoteConfig: saveRemoteConfig, forgetToken: forgetToken } = __req("scripts/data/remote.js");
+const { onSyncChange: onSyncChange, syncNow: syncNow, testSync: testSync, verifyToken: verifyToken, disableSync: disableSync, markDirty: markDirty, status: status } = __req("scripts/data/sync.js");
 const { remoteWritable: remoteWritable } = __req("scripts/data/remote.js");
-const { GENRES: GENRES } = __req("scripts/data/tracks.js");
 const { SCALES: SCALES } = __req("scripts/audio/synth.js");
 const { openSheet: openSheet, closeSheet: closeSheet, initSheet: initSheet } = __req("scripts/ui/sheet.js");
 const { art: art } = __req("scripts/ui/artwork.js");
@@ -9065,21 +8845,6 @@ const icon = (name, size = 16) => {
   return svg;
 };
 
-/** Built-in genres plus the admin's own, as [key, label] for a <select>. */
-const genreOptions = () => admin.genres().map((g) => [g.key, g.label]);
-
-/**
- * The coloured dot beside a track. A genre the admin made has a colour of its
- * own, and there is no CSS class to hang it on, so it goes inline.
- */
-function genreDot(key) {
-  const dot = el('span', { class: 'adm-dot' });
-  const g = admin.genre(key);
-  if (g) dot.style.background = g.color;
-  else if (GENRES[key]) dot.className = `adm-dot adm-dot--${key}`;
-  return dot;
-}
-
 /** Every catalogue change goes through here so the player stays in step. */
 function catalogueChanged(message) {
   player.reconcile();
@@ -9115,8 +8880,8 @@ function setBadge(state) {
  * there is nothing saved, when the admin asks to forget it, or when the stored
  * one stops working.
  */
-function buildGate() {
-  const error = el('p', { class: 'adm-error', role: 'alert' });
+function buildGate(problem = '') {
+  const error = el('p', { class: 'adm-error', role: 'alert', text: problem });
 
   const tokenField = field('Токен GitHub', el('input', {
     type: 'password', id: 'adm-token', autocomplete: 'off', placeholder: 'github_pat_…',
@@ -9293,7 +9058,6 @@ function trackRow(track) {
   };
 
   const head = el('div', { class: 'adm-track__head' }, [
-    genreDot(track.genreKey || 'local'),
     el('div', { class: 'adm-track__id' }, [titleEl, idEl]),
     tagsEl,
     button('Сбросить', discard, 'ghost-btn ghost-btn--sm'),
@@ -9304,11 +9068,6 @@ function trackRow(track) {
     field('Исполнитель', input(track.artist, (v) => set('artist', v), { maxlength: '60' })),
     field('Альбом', input(track.album, (v) => set('album', v), { maxlength: '60' })),
     field('Год', numberInput(track.year, (v) => set('year', Number(v) || 0), { min: '1900', max: '2999' })),
-    field('Жанр', select(track.genreKey, genreOptions(), (v) => {
-      draft.genreKey = v;
-      draft.genre = admin.genreLabel(v) || v;
-      refreshSave();
-    })),
   ];
 
   const music = [
@@ -9388,7 +9147,7 @@ function trackRow(track) {
   ]);
 }
 function addUrlForm() {
-  const draft = { url: '', title: '', artist: '', album: '', blurb: '', cover: '', genreKey: 'local', kind: 'file' };
+  const draft = { url: '', title: '', artist: '', album: '', blurb: '', cover: '', kind: 'file' };
   const error = el('p', { class: 'adm-error', role: 'alert' });
   const hint = el('p', { class: 'adm-note' });
   const preview = el('div', { class: 'adm-cover adm-cover--preview' }, [el('span', { text: 'обложки нет' })]);
@@ -9397,13 +9156,6 @@ function addUrlForm() {
     file: 'Файл скачивается целиком и декодируется. Нужен CORS — без него браузер не отдаст байты. Длительность подставится сама.',
     stream: 'Радио играет напрямую, без скачивания: работает с любого домена, но у потока нет длины — перемотка отключена, а спектрограмма молчит.',
   };
-  const genreField = el('div', { class: 'adm-field' }, [
-    el('span', { class: 'adm-field__label', text: 'Жанр' }),
-    select(draft.genreKey, genreOptions(), (v) => {
-      draft.genreKey = v;
-      draft.genre = admin.genreLabel(v) || v;
-    }),
-  ]);
 
   const setPreview = (value) => {
     preview.replaceChildren();
@@ -9422,8 +9174,6 @@ function addUrlForm() {
   const applyKind = (value) => {
     draft.kind = value;
     hint.textContent = KIND_NOTES[value];
-    /* genre only means something for a file; a stream is always "Радио" */
-    genreField.hidden = value === 'stream';
   };
   applyKind('file');
 
@@ -9441,7 +9191,6 @@ function addUrlForm() {
       field('Название', input(draft.title, (v) => { draft.title = v; }, { maxlength: '60' })),
       field('Исполнитель', input(draft.artist, (v) => { draft.artist = v; }, { maxlength: '60' })),
       field('Альбом', input(draft.album, (v) => { draft.album = v; }, { maxlength: '60' })),
-      genreField,
     ]),
     el('div', { class: 'adm-grid adm-grid--split' }, [
       field('Описание', el('textarea', {
@@ -9511,96 +9260,8 @@ function renderMusic() {
         } }),
     ]),
     el('div', { class: 'adm-extra adm-grid--wide', id: 'adm-extra', hidden: !addFormOpen }, [addUrlForm()]),
-    genreBlock(),
     list,
   );
-}
-
-/* -------------------------------- genres ---------------------------------- */
-
-let genresOpen = false;
-
-/**
- * The admin's own genres.
- *
- * The five that ship with Sonora are a starting point, not a menu: they can be
- * renamed, recoloured and added to here, and they are stored in the repository
- * file like everything else, so a genre made on the phone is on the desktop.
- */
-function genreBlock() {
-  const genres = admin.genres();
-  const mine = genres.filter((g) => g.custom || g.builtin === false);
-
-  const rows = genres.map((g) => {
-    const swatch = el('label', { class: 'adm-genre__swatch', title: 'Цвет' },
-      [el('input', {
-        type: 'color', value: g.color, 'aria-label': `Цвет жанра ${g.label}`,
-        oninput: (e) => {
-          admin.renameGenre(g.key, g.label, e.target.value);
-          catalogueChanged(`Жанр «${g.label}» перекрашен`);
-        },
-      })]);
-    return el('div', { class: 'adm-genre' }, [
-      genreDot(g.key),
-      el('input', {
-        class: 'adm-input', value: g.label, maxlength: '40', 'aria-label': 'Название жанра',
-        onchange: (e) => {
-          const clean = e.target.value.trim();
-          if (!clean) { e.target.value = g.label; return; }
-          try {
-            admin.renameGenre(g.key, clean, g.color);
-            renderMusic();
-            catalogueChanged(`Жанр переименован на «${clean}»`);
-          } catch (err) {
-            toast(String(err.message || err), 'error');
-          }
-        },
-      }),
-      swatch,
-      button('✕', () => {
-        if (!confirm(`Убрать жанр «${g.label}»? Треки останутся, но станут без жанра.`)) return;
-        admin.removeGenre(g.key);
-        renderMusic();
-        catalogueChanged(`Жанр «${g.label}» убран`);
-      }, 'ghost-btn ghost-btn--sm'),
-    ]);
-  });
-
-  const nameInput = el('input', { class: 'adm-input', placeholder: 'Название жанра', maxlength: '40', id: 'adm-genre-name' });
-  const colorInput = el('input', { type: 'color', class: 'adm-genre__pick', value: GENRE_COLORS[mine.length % GENRE_COLORS.length], 'aria-label': 'Цвет нового жанра' });
-
-  const add = () => {
-    const clean = nameInput.value.trim();
-    if (!clean) { toast('Дайте жанру название', 'error'); return; }
-    try {
-      admin.addGenre(clean, colorInput.value);
-      nameInput.value = '';
-      renderMusic();
-      catalogueChanged(`Жанр «${clean}» создан`);
-      qs('#adm-genre-name')?.focus();
-    } catch (err) {
-      toast(String(err.message || err), 'error');
-    }
-  };
-  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
-
-  return el('section', { class: 'adm-block' }, [
-    el('div', { class: 'adm-block__head' }, [
-      el('h3', { text: 'Жанры' }),
-      el('span', { class: 'adm-block__count', text: `${genres.length}` }),
-      button(genresOpen ? 'Скрыть' : 'Изменить', () => { genresOpen = !genresOpen; renderMusic(); }, 'ghost-btn ghost-btn--sm'),
-    ]),
-    el('div', { class: 'adm-genres', id: 'adm-genres', hidden: !genresOpen }, [
-      ...rows,
-      el('div', { class: 'adm-genre adm-genre--new' }, [
-        el('span', { class: 'adm-dot adm-dot--new' }),
-        nameInput,
-        el('label', { class: 'adm-genre__swatch' }, [colorInput]),
-        button('Создать', add, 'primary-btn primary-btn--sm'),
-      ]),
-      el('p', { class: 'adm-hint', text: 'Жанр выбирается в карточке трека. Переименование подхватывают и треки, которые уже стояли в этом жанре.' }),
-    ]),
-  ]);
 }
 
 /* ------------------------------- playlists ------------------------------- */
@@ -9848,10 +9509,22 @@ const TABS = [
   ['sync', 'Синхронизация'],
 ];
 
-function showGate() {
+function showGate(problem = '') {
   const gate = qs('#adm-gate');
   const body = qs('#adm-body');
-  gate.replaceChildren(buildGate());
+  gate.replaceChildren(buildGate(problem));
+  gate.hidden = false;
+  body.hidden = true;
+  setBadge('off');
+}
+
+/** the beat between "the token is claimed" and "the token works" */
+function showChecking() {
+  const gate = qs('#adm-gate');
+  const body = qs('#adm-body');
+  gate.replaceChildren(el('div', { class: 'adm-gate' }, [
+    el('p', { class: 'adm-gate__lead', text: 'Проверяю токен…' }),
+  ]));
   gate.hidden = false;
   body.hidden = true;
   setBadge('off');
@@ -9939,8 +9612,9 @@ function renderTokenBanner() {
  */
 function watchTokenHealth() {
   onSyncChange((s) => {
-    if (s.state !== 'error' || !s.auth) return;
-    tokenRejected = true;
+    const bad = s.state === 'error' && s.auth;
+    if (bad === tokenRejected) return;
+    tokenRejected = bad;
     renderTokenBanner();
   });
 }
@@ -9977,24 +9651,43 @@ function openAdmin(tab = 'site', { expandAdd = false } = {}) {
   if (!root) return;
   open = true;
   qs('#btn-admin')?.setAttribute('aria-expanded', 'true');
+  openSheet(root);
 
-  /* A stored token means signed in. It is the credential: it lives in this
-     browser's storage whether or not the panel is open, and whoever can reach
-     it can write the catalogue through the GitHub API directly. So making
-     someone retype it on every visit guards nothing - it only makes the admin
-     retype a secret to get to a door that secret already unlocked. */
-  if (remoteWritable()) {
+  if (!remoteWritable()) {
+    showGate();
+    switchTab(tab);
+    if (expandAdd) { addFormOpen = true; if (expandAddForm()) pendingExpand = false; }
+    return;
+  }
+
+  /* A stored token is a claim, not a fact. It was fine yesterday and may have
+     been revoked since, and a revoked token opens the panel perfectly happily -
+     the editing UI appears, looks normal, and then a save does nothing. So the
+     token is checked before the editor is shown, and a dead one is dropped and
+     the gate comes back asking for the new one. Half a second of "проверяю" is
+     a fair price for never being misled by an editor that cannot save.
+
+     The one thing this deliberately does not do is block on a dead network:
+     only GitHub refusing the token counts, since a timeout says nothing about
+     whether the token is any good. */
+  showChecking();
+  verifyToken().then((ok) => {
+    /* the sheet may have been closed while the check was in flight */
+    if (!open) return;
+    if (!ok) {
+      forgetToken();
+      showGate('Токен отозван или истёк — введите новый.');
+      return;
+    }
+    tokenRejected = false;
     admin.markAuthed();
     showPanel();
-  } else {
-    showGate();
-  }
-  openSheet(root);
-  switchTab(tab);
-  if (expandAdd) {
-    addFormOpen = true;
-    if (expandAddForm()) pendingExpand = false;
-  }
+    switchTab(tab);
+    if (expandAdd) {
+      addFormOpen = true;
+      if (expandAddForm()) pendingExpand = false;
+    }
+  });
 }
 
 function build() {

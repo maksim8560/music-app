@@ -4,13 +4,9 @@
    player ships with real, endless music and zero binary assets.
    ========================================================================== */
 
-export const GENRES = {
-  ambient: { label: 'Эмбиент', dot: 'ambient' },
-  lofi: { label: 'Lo-Fi', dot: 'lofi' },
-  electronic: { label: 'Электроника', dot: 'electronic' },
-  neo: { label: 'Неоклассика', dot: 'neo' },
-  local: { label: 'Загруженное', dot: 'local' },
-};
+/* There is no genre here, and that is deliberate: it was a fixed list of five
+   the admin could rename but not replace, and a field every track had to be
+   filed under. A track is a file or a live stream, and the badge says which. */
 
 
 /* --------------------------------------------------------------------------

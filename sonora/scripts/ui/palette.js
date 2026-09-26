@@ -7,7 +7,6 @@ import { el, icon, fuzzy, esc, on } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
 import { art } from './artwork.js';
-import { GENRES } from '../data/tracks.js';
 
 const root = document.getElementById('palette');
 const input = document.getElementById('palette-input');
@@ -31,12 +30,7 @@ const actions = () => [
   { id: 'import', title: 'Загрузить аудиофайлы…', icon: 'upload', run: () => document.getElementById('file-input').click() },
   { id: 'liked', title: 'Фильтр: избранное', icon: 'heart', run: () => player.setFilter('liked') },
   { id: 'recent', title: 'Фильтр: недавнее', icon: 'note', run: () => player.setFilter('recent') },
-  ...Object.entries(GENRES).map(([key, g]) => ({
-    id: `filter-${key}`,
-    title: `Фильтр: ${g.label.toLowerCase()}`,
-    icon: 'disc',
-    run: () => player.setFilter(key),
-  })),
+  { id: 'local', title: 'Фильтр: загруженное', icon: 'upload', run: () => player.setFilter('local') },
   { id: 'all', title: 'Фильтр: все треки', icon: 'grid', run: () => player.setFilter('all') },
   { id: 'settings', title: 'Настройки звука и интерфейса', icon: 'sliders', hint: ',', run: () => openSettingsSheet() },
   { id: 'theme', title: 'Сменить тему', icon: document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon', run: () => document.getElementById('btn-theme').click() },

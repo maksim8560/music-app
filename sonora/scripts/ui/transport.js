@@ -10,8 +10,6 @@ import { player } from '../core/player.js';
 import { engine } from '../audio/engine.js';
 import { art } from './artwork.js';
 import { addTask } from '../core/raf.js';
-import { GENRES } from '../data/tracks.js';
-
 const $ = (id) => document.getElementById(id);
 
 const dom = {
@@ -90,13 +88,12 @@ export function syncTrack() {
 
   swapText(dom.title, track.title);
   swapText(dom.artist, track.artist);
-  dom.meta.textContent = `${track.genre} · ${track.album} · ${track.year}`;
+  dom.meta.textContent = `${track.album} · ${track.year}`;
   dom.note.textContent = track.blurb || '';
   /* no description — leave no empty paragraph behind the title */
   dom.note.hidden = !track.blurb;
 
-  const genreLabel = GENRES[track.genreKey]?.label ?? track.genre;
-  dom.badge.querySelector('span').textContent = store.get('playing') ? 'Сейчас играет' : genreLabel;
+  dom.badge.querySelector('span').textContent = store.get('playing') ? 'Сейчас играет' : 'Пауза';
 
   art.paint(dom.heroArt, track);
   art.paint(dom.barArt, track);
@@ -248,10 +245,11 @@ function updateClock() {
     dom.barDur.dateTime = live ? '' : `PT${Math.round(duration)}S`;
   }
 
-  /* the hero badge flips back to the genre when paused */
+  /* the hero badge says what it is doing, since there is no genre to fall back
+     to when it is not playing */
   const track = player.current;
   if (track) {
-    const label = store.get('playing') ? 'Сейчас играет' : (GENRES[track.genreKey]?.label ?? track.genre);
+    const label = store.get('playing') ? 'Сейчас играет' : 'Пауза';
     if (badgeLabel !== label) {
       badgeLabel = label;
       badgeSpan.textContent = label;

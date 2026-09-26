@@ -8,7 +8,6 @@ import { el, icon, fmtTime, plural, on } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
 import { art } from './artwork.js';
-import { GENRES } from '../data/tracks.js';
 import { admin } from '../data/admin.js';
 import { status as syncStatus, onSyncChange } from '../data/sync.js';
 import { toast } from './toast.js';
@@ -41,7 +40,6 @@ function buildRow(track, index) {
     num,
   );
 
-  const genre = GENRES[track.genreKey]?.label ?? track.genre;
   const meta = el('div', { class: 'track__meta' },
     el('div', { class: 'track__title', text: track.title }),
     el('div', { class: 'track__sub' },
@@ -54,7 +52,8 @@ function buildRow(track, index) {
   );
 
   const tail = el('div', { class: 'track__tail' },
-    el('span', { class: `track__badge${track.source === 'file' ? ' track__badge--local' : ''}`, text: track.source === 'file' ? 'Файл' : genre }),
+    /* what kind of thing this is, since there is no genre to say it */
+    el('span', { class: `track__badge${track.source === 'file' ? ' track__badge--local' : ''}`, text: track.source === 'file' ? 'Файл' : 'Радио' }),
     el('span', { class: 'track__time', text: track.duration ? fmtTime(track.duration) : '—:—' }),
   );
 
@@ -181,7 +180,7 @@ function headingFor(filter, search) {
     liked: 'Избранное',
     recent: 'Недавнее',
     local: 'Загруженное',
-  }[filter] || GENRES[filter]?.label || 'Все треки';
+  }[filter] || 'Все треки';
 }
 
 /**

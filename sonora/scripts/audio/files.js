@@ -153,8 +153,6 @@ export async function makeLocalTrack(file) {
     artist,
     album: tags.album || 'Загруженные файлы',
     year: mpegYear || new Date(file.lastModified).getFullYear(),
-    genre: 'Локальный',
-    genreKey: 'local',
     duration: 0, // filled in after decoding
     colors: [c1, c2],
     blurb: `${file.name} · ${(file.size / 1048576).toFixed(1)} МБ`,

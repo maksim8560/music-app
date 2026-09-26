@@ -18,11 +18,10 @@
 import { on, qs, qsa, plural } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
-import { admin, PLAYLIST_ICONS, GENRE_COLORS } from '../data/admin.js';
-import { remoteConfig, saveRemoteConfig } from '../data/remote.js';
-import { onSyncChange, syncNow, testSync, disableSync, markDirty, status } from '../data/sync.js';
+import { admin, PLAYLIST_ICONS } from '../data/admin.js';
+import { remoteConfig, saveRemoteConfig, forgetToken } from '../data/remote.js';
+import { onSyncChange, syncNow, testSync, verifyToken, disableSync, markDirty, status } from '../data/sync.js';
 import { remoteWritable } from '../data/remote.js';
-import { GENRES } from '../data/tracks.js';
 import { SCALES } from '../audio/synth.js';
 import { openSheet, closeSheet, initSheet } from './sheet.js';
 import { art } from './artwork.js';
@@ -86,21 +85,6 @@ const icon = (name, size = 16) => {
   return svg;
 };
 
-/** Built-in genres plus the admin's own, as [key, label] for a <select>. */
-const genreOptions = () => admin.genres().map((g) => [g.key, g.label]);
-
-/**
- * The coloured dot beside a track. A genre the admin made has a colour of its
- * own, and there is no CSS class to hang it on, so it goes inline.
- */
-function genreDot(key) {
-  const dot = el('span', { class: 'adm-dot' });
-  const g = admin.genre(key);
-  if (g) dot.style.background = g.color;
-  else if (GENRES[key]) dot.className = `adm-dot adm-dot--${key}`;
-  return dot;
-}
-
 /** Every catalogue change goes through here so the player stays in step. */
 function catalogueChanged(message) {
   player.reconcile();
@@ -136,8 +120,8 @@ function setBadge(state) {
  * there is nothing saved, when the admin asks to forget it, or when the stored
  * one stops working.
  */
-function buildGate() {
-  const error = el('p', { class: 'adm-error', role: 'alert' });
+function buildGate(problem = '') {
+  const error = el('p', { class: 'adm-error', role: 'alert', text: problem });
 
   const tokenField = field('Токен GitHub', el('input', {
     type: 'password', id: 'adm-token', autocomplete: 'off', placeholder: 'github_pat_…',
@@ -314,7 +298,6 @@ function trackRow(track) {
   };
 
   const head = el('div', { class: 'adm-track__head' }, [
-    genreDot(track.genreKey || 'local'),
     el('div', { class: 'adm-track__id' }, [titleEl, idEl]),
     tagsEl,
     button('Сбросить', discard, 'ghost-btn ghost-btn--sm'),
@@ -325,11 +308,6 @@ function trackRow(track) {
     field('Исполнитель', input(track.artist, (v) => set('artist', v), { maxlength: '60' })),
     field('Альбом', input(track.album, (v) => set('album', v), { maxlength: '60' })),
     field('Год', numberInput(track.year, (v) => set('year', Number(v) || 0), { min: '1900', max: '2999' })),
-    field('Жанр', select(track.genreKey, genreOptions(), (v) => {
-      draft.genreKey = v;
-      draft.genre = admin.genreLabel(v) || v;
-      refreshSave();
-    })),
   ];
 
   const music = [
@@ -409,7 +387,7 @@ function trackRow(track) {
   ]);
 }
 function addUrlForm() {
-  const draft = { url: '', title: '', artist: '', album: '', blurb: '', cover: '', genreKey: 'local', kind: 'file' };
+  const draft = { url: '', title: '', artist: '', album: '', blurb: '', cover: '', kind: 'file' };
   const error = el('p', { class: 'adm-error', role: 'alert' });
   const hint = el('p', { class: 'adm-note' });
   const preview = el('div', { class: 'adm-cover adm-cover--preview' }, [el('span', { text: 'обложки нет' })]);
@@ -418,13 +396,6 @@ function addUrlForm() {
     file: 'Файл скачивается целиком и декодируется. Нужен CORS — без него браузер не отдаст байты. Длительность подставится сама.',
     stream: 'Радио играет напрямую, без скачивания: работает с любого домена, но у потока нет длины — перемотка отключена, а спектрограмма молчит.',
   };
-  const genreField = el('div', { class: 'adm-field' }, [
-    el('span', { class: 'adm-field__label', text: 'Жанр' }),
-    select(draft.genreKey, genreOptions(), (v) => {
-      draft.genreKey = v;
-      draft.genre = admin.genreLabel(v) || v;
-    }),
-  ]);
 
   const setPreview = (value) => {
     preview.replaceChildren();
@@ -443,8 +414,6 @@ function addUrlForm() {
   const applyKind = (value) => {
     draft.kind = value;
     hint.textContent = KIND_NOTES[value];
-    /* genre only means something for a file; a stream is always "Радио" */
-    genreField.hidden = value === 'stream';
   };
   applyKind('file');
 
@@ -462,7 +431,6 @@ function addUrlForm() {
       field('Название', input(draft.title, (v) => { draft.title = v; }, { maxlength: '60' })),
       field('Исполнитель', input(draft.artist, (v) => { draft.artist = v; }, { maxlength: '60' })),
       field('Альбом', input(draft.album, (v) => { draft.album = v; }, { maxlength: '60' })),
-      genreField,
     ]),
     el('div', { class: 'adm-grid adm-grid--split' }, [
       field('Описание', el('textarea', {
@@ -532,96 +500,8 @@ function renderMusic() {
         } }),
     ]),
     el('div', { class: 'adm-extra adm-grid--wide', id: 'adm-extra', hidden: !addFormOpen }, [addUrlForm()]),
-    genreBlock(),
     list,
   );
-}
-
-/* -------------------------------- genres ---------------------------------- */
-
-let genresOpen = false;
-
-/**
- * The admin's own genres.
- *
- * The five that ship with Sonora are a starting point, not a menu: they can be
- * renamed, recoloured and added to here, and they are stored in the repository
- * file like everything else, so a genre made on the phone is on the desktop.
- */
-function genreBlock() {
-  const genres = admin.genres();
-  const mine = genres.filter((g) => g.custom || g.builtin === false);
-
-  const rows = genres.map((g) => {
-    const swatch = el('label', { class: 'adm-genre__swatch', title: 'Цвет' },
-      [el('input', {
-        type: 'color', value: g.color, 'aria-label': `Цвет жанра ${g.label}`,
-        oninput: (e) => {
-          admin.renameGenre(g.key, g.label, e.target.value);
-          catalogueChanged(`Жанр «${g.label}» перекрашен`);
-        },
-      })]);
-    return el('div', { class: 'adm-genre' }, [
-      genreDot(g.key),
-      el('input', {
-        class: 'adm-input', value: g.label, maxlength: '40', 'aria-label': 'Название жанра',
-        onchange: (e) => {
-          const clean = e.target.value.trim();
-          if (!clean) { e.target.value = g.label; return; }
-          try {
-            admin.renameGenre(g.key, clean, g.color);
-            renderMusic();
-            catalogueChanged(`Жанр переименован на «${clean}»`);
-          } catch (err) {
-            toast(String(err.message || err), 'error');
-          }
-        },
-      }),
-      swatch,
-      button('✕', () => {
-        if (!confirm(`Убрать жанр «${g.label}»? Треки останутся, но станут без жанра.`)) return;
-        admin.removeGenre(g.key);
-        renderMusic();
-        catalogueChanged(`Жанр «${g.label}» убран`);
-      }, 'ghost-btn ghost-btn--sm'),
-    ]);
-  });
-
-  const nameInput = el('input', { class: 'adm-input', placeholder: 'Название жанра', maxlength: '40', id: 'adm-genre-name' });
-  const colorInput = el('input', { type: 'color', class: 'adm-genre__pick', value: GENRE_COLORS[mine.length % GENRE_COLORS.length], 'aria-label': 'Цвет нового жанра' });
-
-  const add = () => {
-    const clean = nameInput.value.trim();
-    if (!clean) { toast('Дайте жанру название', 'error'); return; }
-    try {
-      admin.addGenre(clean, colorInput.value);
-      nameInput.value = '';
-      renderMusic();
-      catalogueChanged(`Жанр «${clean}» создан`);
-      qs('#adm-genre-name')?.focus();
-    } catch (err) {
-      toast(String(err.message || err), 'error');
-    }
-  };
-  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
-
-  return el('section', { class: 'adm-block' }, [
-    el('div', { class: 'adm-block__head' }, [
-      el('h3', { text: 'Жанры' }),
-      el('span', { class: 'adm-block__count', text: `${genres.length}` }),
-      button(genresOpen ? 'Скрыть' : 'Изменить', () => { genresOpen = !genresOpen; renderMusic(); }, 'ghost-btn ghost-btn--sm'),
-    ]),
-    el('div', { class: 'adm-genres', id: 'adm-genres', hidden: !genresOpen }, [
-      ...rows,
-      el('div', { class: 'adm-genre adm-genre--new' }, [
-        el('span', { class: 'adm-dot adm-dot--new' }),
-        nameInput,
-        el('label', { class: 'adm-genre__swatch' }, [colorInput]),
-        button('Создать', add, 'primary-btn primary-btn--sm'),
-      ]),
-      el('p', { class: 'adm-hint', text: 'Жанр выбирается в карточке трека. Переименование подхватывают и треки, которые уже стояли в этом жанре.' }),
-    ]),
-  ]);
 }
 
 /* ------------------------------- playlists ------------------------------- */
@@ -869,10 +749,22 @@ const TABS = [
   ['sync', 'Синхронизация'],
 ];
 
-function showGate() {
+function showGate(problem = '') {
   const gate = qs('#adm-gate');
   const body = qs('#adm-body');
-  gate.replaceChildren(buildGate());
+  gate.replaceChildren(buildGate(problem));
+  gate.hidden = false;
+  body.hidden = true;
+  setBadge('off');
+}
+
+/** the beat between "the token is claimed" and "the token works" */
+function showChecking() {
+  const gate = qs('#adm-gate');
+  const body = qs('#adm-body');
+  gate.replaceChildren(el('div', { class: 'adm-gate' }, [
+    el('p', { class: 'adm-gate__lead', text: 'Проверяю токен…' }),
+  ]));
   gate.hidden = false;
   body.hidden = true;
   setBadge('off');
@@ -960,8 +852,9 @@ function renderTokenBanner() {
  */
 function watchTokenHealth() {
   onSyncChange((s) => {
-    if (s.state !== 'error' || !s.auth) return;
-    tokenRejected = true;
+    const bad = s.state === 'error' && s.auth;
+    if (bad === tokenRejected) return;
+    tokenRejected = bad;
     renderTokenBanner();
   });
 }
@@ -998,24 +891,43 @@ export function openAdmin(tab = 'site', { expandAdd = false } = {}) {
   if (!root) return;
   open = true;
   qs('#btn-admin')?.setAttribute('aria-expanded', 'true');
+  openSheet(root);
 
-  /* A stored token means signed in. It is the credential: it lives in this
-     browser's storage whether or not the panel is open, and whoever can reach
-     it can write the catalogue through the GitHub API directly. So making
-     someone retype it on every visit guards nothing - it only makes the admin
-     retype a secret to get to a door that secret already unlocked. */
-  if (remoteWritable()) {
+  if (!remoteWritable()) {
+    showGate();
+    switchTab(tab);
+    if (expandAdd) { addFormOpen = true; if (expandAddForm()) pendingExpand = false; }
+    return;
+  }
+
+  /* A stored token is a claim, not a fact. It was fine yesterday and may have
+     been revoked since, and a revoked token opens the panel perfectly happily -
+     the editing UI appears, looks normal, and then a save does nothing. So the
+     token is checked before the editor is shown, and a dead one is dropped and
+     the gate comes back asking for the new one. Half a second of "проверяю" is
+     a fair price for never being misled by an editor that cannot save.
+
+     The one thing this deliberately does not do is block on a dead network:
+     only GitHub refusing the token counts, since a timeout says nothing about
+     whether the token is any good. */
+  showChecking();
+  verifyToken().then((ok) => {
+    /* the sheet may have been closed while the check was in flight */
+    if (!open) return;
+    if (!ok) {
+      forgetToken();
+      showGate('Токен отозван или истёк — введите новый.');
+      return;
+    }
+    tokenRejected = false;
     admin.markAuthed();
     showPanel();
-  } else {
-    showGate();
-  }
-  openSheet(root);
-  switchTab(tab);
-  if (expandAdd) {
-    addFormOpen = true;
-    if (expandAddForm()) pendingExpand = false;
-  }
+    switchTab(tab);
+    if (expandAdd) {
+      addFormOpen = true;
+      if (expandAddForm()) pendingExpand = false;
+    }
+  });
 }
 
 function build() {
