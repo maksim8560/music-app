@@ -9,6 +9,7 @@ import { qs } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { admin } from '../data/admin.js';
 import { player } from '../core/player.js';
+import { markDirty } from '../data/sync.js';
 import { toast } from './toast.js';
 
 let signature = '';
@@ -101,6 +102,7 @@ export function initSidebarPlaylists() {
         closeEditor();
         renderSidePlaylists();
         player.reconcile();
+        markDirty();
         toast(`Плейлист «${name}» создан — наполните его в админ-панели`, 'ok', 4000);
       } catch (err) {
         toast(String(err.message || err), 'error');

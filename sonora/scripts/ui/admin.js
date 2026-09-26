@@ -18,6 +18,8 @@ import { on, qs, qsa, plural } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
 import { admin, PLAYLIST_ICONS } from '../data/admin.js';
+import { remoteConfig, saveRemoteConfig } from '../data/remote.js';
+import { onSyncChange, syncNow, testSync, disableSync, markDirty } from '../data/sync.js';
 import { GENRES } from '../data/tracks.js';
 import { SCALES } from '../audio/synth.js';
 import { openSheet, closeSheet, initSheet } from './sheet.js';
@@ -85,6 +87,9 @@ const icon = (name, size = 16) => {
 /** Every catalogue change goes through here so the player stays in step. */
 function catalogueChanged(message) {
   player.reconcile();
+  /* with a repository configured this is what makes the change reach every
+     other device — one debounced write per burst of edits */
+  markDirty();
   if (message) toast(message, 'ok');
 }
 
@@ -555,7 +560,7 @@ function buildPlaylists() {
           admin.addPlaylist(draft.name, draft.icon);
           renderPlaylists();
           renderSidePlaylists();
-          player.reconcile();
+          catalogueChanged();
         } catch (err) {
           error.textContent = String(err.message || err);
         }
@@ -568,7 +573,7 @@ function buildPlaylists() {
     name.addEventListener('input', () => admin.renamePlaylist(pl.id, name.value));
     name.addEventListener('change', () => {
       renderSidePlaylists();
-      player.reconcile();
+      catalogueChanged();
     });
 
     const items = tracks.length
@@ -578,7 +583,7 @@ function buildPlaylists() {
           admin.toggleInPlaylist(pl.id, t.id);
           count.textContent = countFor(pl.id);
           renderSidePlaylists();
-          player.reconcile();
+          catalogueChanged();
         });
         return el('label', { class: 'adm-pl__track' }, [
           box,
@@ -612,7 +617,7 @@ function buildPlaylists() {
             if (store.get('filter') === `pl:${pl.id}`) player.setFilter('all');
             renderPlaylists();
             renderSidePlaylists();
-            player.reconcile();
+            catalogueChanged();
           }, 'ghost-btn ghost-btn--sm ghost-btn--danger'),
         ]),
       ]),
@@ -625,6 +630,81 @@ function buildPlaylists() {
     list.length
       ? el('div', { class: 'adm-tracks' }, list)
       : el('p', { class: 'adm-note', text: 'Плейлистов пока нет. Создайте первый — он появится в боковом меню.' }),
+  ]);
+}
+
+/* ------------------------------- sync ------------------------------------ */
+
+/**
+ * Where the catalogue lives.
+ *
+ * With a token configured the whole document becomes a file in the repository,
+ * and any other device picks it up on reload. Without one, everything stays in
+ * this browser — which is the honest default, and the reason a change made on
+ * a phone used to vanish when you came back to the desktop.
+ */
+function buildSync() {
+  const cfg = remoteConfig();
+  const draft = { repo: cfg.repo, branch: cfg.branch, path: cfg.path, token: cfg.token };
+  const error = el('p', { class: 'adm-error', role: 'alert' });
+  const statusLine = el('p', { class: 'adm-sync__status' });
+  const paint = (s) => {
+    statusLine.dataset.state = s.state;
+    const map = {
+      off: 'Отключено: каталог и плейлисты хранятся только в этом браузере.',
+      idle: s.message,
+      loading: s.message,
+      saving: s.message,
+      saved: s.message,
+      error: s.message,
+    };
+    statusLine.textContent = map[s.state] || '';
+  };
+  const off = onSyncChange(paint);
+
+  const set = (k, v) => { draft[k] = v; };
+
+  return el('div', { class: 'adm-stack' }, [
+    el('div', { class: 'adm-add' }, [
+      el('h3', { text: 'Где хранить каталог' }),
+      el('p', { class: 'adm-note', text: 'Укажите репозиторий и токен — и всё, что вы сохраняете, будет записываться файлом в репозиторий. На любом другом устройстве достаточно обновить страницу: полка, обложки и плейлисты приедут оттуда.' }),
+      el('div', { class: 'adm-grid adm-grid--one' }, [
+        field('Репозиторий', input(draft.repo, (v) => set('repo', v), { placeholder: 'maksim8560/music-app' })),
+        field('Ветка', input(draft.branch, (v) => set('branch', v), { placeholder: 'Main' })),
+        field('Путь к файлу', input(draft.path, (v) => set('path', v), { placeholder: 'sonora/catalogue.json' })),
+        field('Токен', input(draft.token, (v) => set('token', v.trim()), { type: 'password', placeholder: 'github_pat_…' }),
+          'Тонкий токен (fine-grained) с доступом только к этому репозиторию и только на чтение и запись содержимого. Он хранится в этом браузере и в файл не попадает.'),
+      ]),
+      error,
+      el('div', { class: 'adm-add__row' }, [
+        el('button', { class: 'primary-btn', type: 'button', text: 'Сохранить и проверить', onclick: async () => {
+          error.textContent = '';
+          saveRemoteConfig({ ...draft });
+          const ok = await testSync();
+          if (ok) {
+            renderSync();
+            catalogueChanged('Синхронизация включена');
+          }
+        } }),
+        el('button', { class: 'ghost-btn', type: 'button', text: 'Сохранить сейчас', onclick: async () => {
+          saveRemoteConfig({ ...draft });
+          await syncNow();
+        } }),
+        el('button', { class: 'ghost-btn ghost-btn--danger', type: 'button', text: 'Отключить', onclick: () => {
+          disableSync();
+          renderSync();
+          toast('Синхронизация отключена, каталог снова только в этом браузере', 'info', 4000);
+        } }),
+      ]),
+      statusLine,
+    ]),
+
+    el('div', { class: 'adm-add adm-warn' }, [
+      el('h3', { text: 'Про пароль — честно' }),
+      el('p', { text: 'Пароль панели не граница безопасности. Он хранится как хеш с солью, и если каталог лежит в публичном репозитории, этот хеш видят все, кто может читать репозиторий. Короткий пароль из шести цифр перебирается за секунды, поэтому не полагайтесь на него.' }),
+      el('p', { text: 'Что действительно защищает запись — токен GitHub. Пока он есть только у вас, писать в репозиторий можете только вы. Если он утечёт, доступ получает тот, кто его нашёл, поэтому у токена должны быть минимальные права и короткий срок.' }),
+      el('p', { text: 'Пароль в панели остаётся как удобная блокировка от случайного открытия — чтобы сосед или ребёнок не наткнулся на настройки. Для такой роли подходит любая длинная фраза.' }),
+    ]),
   ]);
 }
 
@@ -672,6 +752,7 @@ const TABS = [
   ['site', 'Сайт'],
   ['music', 'Музыка'],
   ['playlists', 'Плейлисты'],
+  ['sync', 'Синхронизация'],
   ['password', 'Пароль'],
 ];
 
@@ -694,6 +775,7 @@ function showPanel() {
   renderSite();
   renderMusic();
   renderPlaylists();
+  renderSync();
   renderPassword();
   /* the add form may have been asked for before the password was typed */
   if (pendingExpand) {
@@ -729,6 +811,11 @@ const renderPlaylists = () => {
   if (host) host.replaceChildren(buildPlaylists());
 };
 
+const renderSync = () => {
+  const host = qs('#adm-sync');
+  if (host) host.replaceChildren(buildSync());
+};
+
 function switchTab(name) {
   for (const btn of qsa('#adm-tabs button')) {
     btn.classList.toggle('is-active', btn.dataset.tab === name);
@@ -739,6 +826,7 @@ function switchTab(name) {
   if (name === 'site') renderSite();
   if (name === 'music') renderMusic();
   if (name === 'playlists') renderPlaylists();
+  if (name === 'sync') renderSync();
   if (name === 'password') renderPassword();
 }
 
@@ -785,6 +873,7 @@ function build() {
           el('section', { 'data-tab': 'site' }, [el('div', { class: 'adm-section__body', id: 'adm-site' })]),
           el('section', { 'data-tab': 'music', hidden: true }, [el('div', { id: 'adm-music' })]),
           el('section', { 'data-tab': 'playlists', hidden: true }, [el('div', { id: 'adm-playlists' })]),
+          el('section', { 'data-tab': 'sync', hidden: true }, [el('div', { id: 'adm-sync' })]),
           el('section', { 'data-tab': 'password', hidden: true }, [el('div', { id: 'adm-password' })]),
         ]),
       ]),

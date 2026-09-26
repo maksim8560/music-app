@@ -557,8 +557,12 @@
 }
 
 @media (max-width: 720px) {
-  /* the bar stacks the transport over the tools, so it is ~132px tall */
-  :root { --bar-h: 128px; }
+  /* the bar stacks the transport over the tools and measures ~132px, so the
+     reservation is a little taller than that: a bar that outgrows --bar-h
+     covers the last row of the list instead of sitting below it. The bottom
+     inset goes into the reservation too, or a phone with a home indicator
+     would eat the last few pixels of the list. */
+  :root { --bar-h: calc(138px + env(safe-area-inset-bottom, 0px)); }
   .playbar__inner { grid-template-columns: minmax(0, 1fr) auto; gap: var(--gap-2); }
   .playbar__center { grid-row: 1; grid-column: 2; }
   .playbar__right { grid-row: 2; grid-column: 1 / -1; justify-content: space-between; }
@@ -578,4 +582,44 @@
      instead of overflowing the panel */
   .hero .transport { flex-wrap: wrap; }
   .btn-like-text { display: none; }
+}
+
+/* ==========================================================================
+   Touch
+   The desktop sizes are right for a mouse and too small for a thumb: 36px
+   controls sit either side of the gap and are easy to miss or hit twice. Only
+   coarse pointers get the larger targets, so a narrow desktop window keeps its
+   compact look.
+   ========================================================================== */
+@media (pointer: coarse) {
+  .icon-btn,
+  .side-list__item,
+  .side-list__add,
+  .chips .chip {
+    min-height: 44px;
+  }
+  .play-btn { min-width: 52px; min-height: 52px; }
+  .np .icon-btn { min-height: 40px; }
+  .side-list__item svg { width: 16px; height: 16px; }
+  .side-list__add svg { width: 16px; height: 16px; }
+}
+
+/* ==========================================================================
+   Phones with a notch or a home indicator
+   The viewport is declared as viewport-fit=cover, so the fixed bars run under
+   the system UI unless they are told to keep clear of it.
+   ========================================================================== */
+@supports (padding: max(0px)) {
+  .topbar {
+    padding-top: max(var(--gap-3), env(safe-area-inset-top, 0px));
+  }
+  .app > .playbar {
+    bottom: max(var(--gap-2), env(safe-area-inset-bottom, 0px));
+  }
+  .app > .sidebar {
+    top: max(var(--gap-3), env(safe-area-inset-top, 0px));
+  }
+  .toasts {
+    padding-bottom: max(var(--gap-3), env(safe-area-inset-bottom, 0px));
+  }
 }

@@ -400,6 +400,42 @@
   padding: 6px 9px;
 }
 
+.adm-sync__status {
+  margin: var(--gap-2) 0 0;
+  font-size: var(--t-small);
+  line-height: 1.5;
+  color: var(--text-3);
+  padding-left: 10px;
+  border-left: 2px solid var(--glass-line);
+}
+.adm-sync__status[data-state="error"] {
+  color: #ff8a80;
+  border-left-color: #ff5f57;
+}
+.adm-sync__status[data-state="saved"] {
+  color: #7fe0b0;
+  border-left-color: #63d69a;
+}
+.adm-sync__status[data-state="saving"],
+.adm-sync__status[data-state="loading"] {
+  color: #ffc46b;
+  border-left-color: #ffc46b;
+}
+
+/* the one place that says plainly what the password is and is not */
+.adm-warn {
+  border-color: color-mix(in oklab, #ffc46b 35%, transparent);
+  background: color-mix(in oklab, #ffc46b 8%, transparent);
+}
+.adm-warn h3 { color: #ffc46b; }
+.adm-warn p {
+  margin: 0 0 var(--gap-2);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.adm-warn p:last-child { margin-bottom: 0; }
+
 /* ------------------------------ playlists ------------------------------- */
 .adm-stack { display: grid; gap: var(--gap-4); }
 

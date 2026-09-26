@@ -482,9 +482,38 @@ class Admin {
 
   /* --------------------------- import / export -------------------------- */
 
-  export() {
+  /**
+   * The whole document, minus the password.
+   *
+   * This is what gets written to `catalogue.json` in the repository, so it has
+   * to be the complete state and nothing more: no token, no session, no
+   * password. The token lives in this browser only, never in the file.
+   */
+  document() {
     const { auth, ...rest } = this.#state;
-    return JSON.stringify({ ...rest, exportedAt: new Date().toISOString() }, null, 2);
+    return { version: 1, ...rest, exportedAt: new Date().toISOString() };
+  }
+
+  /** Adopt a document wholesale — used when the file in the repo is newer. */
+  load(doc) {
+    if (!doc || typeof doc !== 'object') throw new Error('Файл не похож на настройки Sonora');
+    this.#state = {
+      ...DEFAULTS(),
+      ...doc,
+      site: { ...DEFAULTS().site, ...(doc.site || {}) },
+      overrides: doc.overrides && typeof doc.overrides === 'object' ? doc.overrides : {},
+      hidden: Array.isArray(doc.hidden) ? doc.hidden.filter((x) => typeof x === 'string') : [],
+      custom: Array.isArray(doc.custom) ? doc.custom.filter((t) => t && typeof t.id === 'string') : [],
+      playlists: normalisePlaylists(doc.playlists),
+      auth: this.#state.auth,
+    };
+    this.prunePlaylists();
+    write(this.#state);
+    return this.library();
+  }
+
+  export() {
+    return JSON.stringify(this.document(), null, 2);
   }
 
   /** Merge an exported file. The password never travels with it. */

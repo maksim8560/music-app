@@ -14,6 +14,7 @@ import { initTransport, syncTrack, syncState, syncVolume, syncLike } from './ui/
 import { initPalette, open as openPalette, paletteShortcut } from './ui/palette.js';
 import { initSettings, applyTheme, openSettingsSheet, openQueueSheet } from './ui/settings.js';
 import { initAdmin, openAdmin } from './ui/admin.js';
+import { initSync } from './data/sync.js';
 import { admin } from './data/admin.js';
 import { initShortcuts } from './ui/shortcuts.js';
 import { createVisualizers } from './ui/visualizer.js';
@@ -375,6 +376,10 @@ function boot() {
   flush();
   renderLibrary();
   renderQueue();
+  /* The shared catalogue, if a repository is configured. Started after the
+     first paint so a slow or unreachable GitHub never delays the page opening;
+     when it lands, reconcile() puts the shelf in place. */
+  initSync();
   syncTrack();
   syncState();
   updateCounters();
