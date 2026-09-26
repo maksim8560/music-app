@@ -17,9 +17,6 @@ const SESSION_KEY = 'sonora.admin.session';
 /** Glyphs a playlist may carry — all of them already in the sprite. */
 export const PLAYLIST_ICONS = ['note', 'disc', 'wave', 'heart', 'queue', 'spark', 'list', 'grid'];
 
-/** See setup(): the hash is public, so short passwords are no protection. */
-export const MIN_PASSWORD = 8;
-
 /** Fields an admin may override on a shipped track. */
 const EDITABLE = [
   'title', 'artist', 'album', 'year', 'genre', 'genreKey',
@@ -51,8 +48,6 @@ function safeImage(value) {
 
 const DEFAULTS = () => ({
   version: 1,
-  /* null until the first visit sets a password */
-  auth: null,
   site: {
     name: 'Sonora',
     tagline: 'Glass Edition',
@@ -152,7 +147,7 @@ function read() {
     if (!raw) return DEFAULTS();
     const saved = JSON.parse(raw);
     const base = DEFAULTS();
-    return {
+    const state = {
       ...base,
       ...saved,
       site: { ...base.site, ...(saved.site || {}) },
@@ -162,6 +157,12 @@ function read() {
       playlists: normalisePlaylists(saved.playlists),
       genres: normaliseGenres(saved.genres),
     };
+    /* A password hash from before it was removed. It is worthless - it sat
+       next to the token the whole time - but leaving it in place would keep
+       shipping it to the repository inside the document, and a hash nobody can
+       use is still a hash in a public file. */
+    delete state.auth;
+    return state;
   } catch {
     return DEFAULTS();
   }
@@ -178,41 +179,7 @@ function write(state) {
   return true;
 }
 
-/* ------------------------------- password -------------------------------- */
-
-/** Salt + digest. SHA-256 when SubtleCrypto is reachable, a weak fallback otherwise. */
-async function digest(algo, salt, password) {
-  const text = `${algo}:${salt}:${password}`;
-  if (algo === 'sha256' && globalThis.crypto?.subtle) {
-    const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-    return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  /* No SubtleCrypto (insecure context). Two FNV-style mixes — enough to keep a
-     shoulder-surfer out, which is all this lock is ever for. */
-  let h1 = 0x811c9dc5;
-  let h2 = 0x01000193;
-  for (let i = 0; i < text.length; i++) {
-    const c = text.charCodeAt(i);
-    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
-    h2 = Math.imul(h2 ^ Math.imul(c + i, 2246822519), 3266489917) >>> 0;
-  }
-  return `${h1.toString(16).padStart(8, '0')}${h2.toString(16).padStart(8, '0')}`;
-}
-
-const randomSalt = () => {
-  const buf = new Uint8Array(16);
-  if (globalThis.crypto?.getRandomValues) crypto.getRandomValues(buf);
-  else for (let i = 0; i < buf.length; i++) buf[i] = Math.floor(Math.random() * 256);
-  return [...buf].map((b) => b.toString(16).padStart(2, '0')).join('');
-};
-
-const bestAlgo = () => (globalThis.crypto?.subtle ? 'sha256' : 'weak');
-
-async function makeAuth(password) {
-  const algo = bestAlgo();
-  const salt = randomSalt();
-  return { algo, salt, hash: await digest(algo, salt, password) };
-}
+/* --------------------------------- admin --------------------------------- */
 
 /* --------------------------------- admin --------------------------------- */
 
@@ -229,7 +196,6 @@ class Admin {
 
   get state() { return this.#state; }
   get authed() { return this.#authed; }
-  get hasPassword() { return !!this.#state.auth; }
   get isEmpty() {
     const s = this.#state;
     return !s.custom.length && !s.hidden.length && !Object.keys(s.overrides).length;
@@ -237,57 +203,27 @@ class Admin {
 
   /* ------------------------------ auth ---------------------------------- */
 
-  /** First visit: set the password. Returns false if one already exists. */
-  async setup(password) {
-    if (this.hasPassword) return false;
-    /* The hash ends up in a file anyone can read, so a four-character password
-       is not a secret at all. Eight is the floor here and a phrase is what
-       actually makes sense. */
-    if (!password || password.length < MIN_PASSWORD) {
-      throw new Error(`Пароль от ${MIN_PASSWORD} символов — лучше длинная фраза`);
-    }
-    this.#state.auth = await makeAuth(password);
-    write(this.#state);
+  /**
+   * There is no password, and there was never a reason for one.
+   *
+   * It used to sit in this same localStorage as the token, one key away, so
+   * anyone who could read one could read the other - it guarded nothing. And
+   * the panel is not the door anyway: the token is, and it writes the
+   * catalogue straight to the repository without ever opening this UI. A second
+   * lock on a door that is not the real one is worse than no lock, because it
+   * looks like protection.
+   *
+   * So the token is the whole of it. This flag is only a convenience: it keeps
+   * the panel from asking again inside the same tab.
+   */
+  markAuthed() {
     this.#authed = true;
-    this.#markSession();
-    return true;
-  }
-
-  async login(password) {
-    const auth = this.#state.auth;
-    if (!auth) return this.setup(password);
-    const got = await digest(auth.algo, auth.salt, password || '');
-    if (got !== auth.hash) return false;
-    this.#authed = true;
-    this.#markSession();
-    return true;
-  }
-
-  async changePassword(current, next) {
-    if (!(await this.login(current))) throw new Error('Текущий пароль не подходит');
-    if (!next || next.length < MIN_PASSWORD) throw new Error(`Новый пароль от ${MIN_PASSWORD} символов — лучше длинная фраза`);
-    this.#state.auth = await makeAuth(next);
-    write(this.#state);
-    return true;
+    try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* private mode */ }
   }
 
   logout() {
     this.#authed = false;
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
-  }
-
-  /**
-   * The token already proved who this is, and a token owner has no need of a
-   * second password. Called after a token check so the panel can be opened
-   * without one, and so "первый в браузере" stops being a thing.
-   */
-  markAuthed() {
-    this.#authed = true;
-    this.#markSession();
-  }
-
-  #markSession() {
-    try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* ignore */ }
   }
 
   /* ------------------------------- site --------------------------------- */
@@ -654,15 +590,15 @@ class Admin {
   /* --------------------------- import / export -------------------------- */
 
   /**
-   * The whole document, minus the password.
+   * The whole document, minus anything that must not leave this browser.
    *
    * This is what gets written to `catalogue.json` in the repository, so it has
-   * to be the complete state and nothing more: no token, no session, no
-   * password. The token lives in this browser only, never in the file.
+   * to be the complete state and nothing more: no token, no session. The token
+   * lives in this browser only, never in the file. There is no password left to
+   * strip, and that is the point of removing it.
    */
   document() {
-    const { auth, ...rest } = this.#state;
-    return { version: 1, ...rest, exportedAt: new Date().toISOString() };
+    return { version: 1, ...this.#state, exportedAt: new Date().toISOString() };
   }
 
   /**

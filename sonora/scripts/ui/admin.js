@@ -1,17 +1,18 @@
 /* ==========================================================================
    ui/admin.js — sign-in gate and the admin panel
    ----------------------------------------------------------------------------
-   The button lives at the top right. Until a password is set the panel asks
-   for one; after that it opens straight into the settings.
+   The button lives at the top right. The gate is the GitHub token, and once it
+   has been entered it stays in this browser, so the panel opens straight away
+   afterwards.
 
    Sections:
      Сайт    — name, tagline, description, accent, background image
      Музыка  — edit / hide / reseed every track, add generative ones, add by
                URL, export and import the whole configuration
-     Пароль  — change the password, sign out
 
-   Everything is stored in this browser only. There is no server, so the
-   password is a local lock, not a security boundary.
+   There is no password and there is no second lock. The token is the whole of
+   it: it is what allows the write, and a token sitting in this browser's
+   storage could write the catalogue without ever opening this panel.
    ========================================================================== */
 
 import { on, qs, qsa, plural } from '../core/dom.js';
@@ -121,32 +122,31 @@ function setBadge(state) {
 /* -------------------------------- login --------------------------------- */
 
 /**
- * The gate is the token, not the password.
+ * The gate is the token, and that is the whole of it.
  *
- * A password that lives in localStorage is no gate at all: every visitor to a
- * public site found themselves being asked to create one, and creating one
- * opened the panel. The token is the only thing here that is actually a key -
- * it is what lets the browser write to the repository - so the panel asks for
- * it, and the password becomes a second lock on your own devices rather than
- * the thing standing between a stranger and the settings.
+ * A password in localStorage was no gate at all: every visitor to a public site
+ * was asked to create one, and creating one opened the panel. The token is the
+ * only thing here that is actually a key - it is what lets the browser write to
+ * the repository.
+ *
+ * It is remembered. Asking for the same secret on every visit is a chore that
+ * teaches the value is not important, and the token is already sitting in this
+ * browser's storage, where whoever can reach it can write the catalogue without
+ * ever opening this panel. So it is saved, and the gate only reappears when
+ * there is nothing saved, when the admin asks to forget it, or when the stored
+ * one stops working.
  */
 function buildGate() {
-  const cfg = remoteConfig();
   const error = el('p', { class: 'adm-error', role: 'alert' });
 
   const tokenField = field('Токен GitHub', el('input', {
     type: 'password', id: 'adm-token', autocomplete: 'off', placeholder: 'github_pat_…',
   }), 'Тонкий токен: доступ только к этому репозиторию и только на чтение и запись содержимого.');
 
-  const pwField = field('Пароль панели', el('input', {
-    type: 'password', id: 'adm-pass', autocomplete: 'current-password', placeholder: '••••••',
-  }), admin.hasPassword ? 'Ваш пароль от панели на этом устройстве.' : 'Можно пропустить — это дополнительный замок, а не главный.');
-
   const submit = async (e) => {
     e?.preventDefault();
     error.textContent = '';
     const token = tokenField.querySelector('input').value.trim();
-    const password = pwField.querySelector('input').value;
     if (!token) {
       error.textContent = 'Нужен токен: без него панель не может записывать каталог.';
       return;
@@ -155,19 +155,7 @@ function buildGate() {
       saveRemoteConfig({ token });
       const ok = await testSync();
       if (!ok) throw new Error(status().message || 'Токен не подошёл');
-      if (admin.hasPassword) {
-        if (!password) {
-          error.textContent = 'Введите пароль панели';
-          return;
-        }
-        if (!(await admin.login(password))) throw new Error('Неверный пароль');
-      } else if (password) {
-        await admin.setup(password);
-        toast('Пароль задан', 'ok');
-      } else {
-        /* a valid token is proof enough; no password to invent */
-        admin.markAuthed();
-      }
+      admin.markAuthed();
       showPanel();
       /* Nothing that was already in this browser should be stranded there now
          that writing works: push what is on screen straight into the file. */
@@ -179,13 +167,13 @@ function buildGate() {
 
   return el('form', { class: 'adm-gate', onsubmit: submit }, [
     el('p', { class: 'adm-gate__lead', text: 'Панель открывается токеном GitHub. Он и есть главный замок: без него каталог не изменить.' }),
-    el('div', { class: 'adm-stack' }, [tokenField, pwField]),
+    el('div', { class: 'adm-stack' }, [tokenField]),
     error,
     el('div', { class: 'adm-gate__row' }, [
-      el('button', { class: 'primary-btn', type: 'submit', text: 'Войти' }),
+      el('button', { class: 'primary-btn', type: 'submit', text: 'Войти и запомнить' }),
       button('Отмена', () => close(), 'ghost-btn'),
     ]),
-    el('p', { class: 'adm-note', text: 'Токен хранится в этом браузере и не попадает в файл. Пароль хранится здесь же, отдельно от токена.' }),
+    el('p', { class: 'adm-note', text: 'Токен сохранится в этом браузере — в следующий раз панель откроется сама. В файл каталога он не попадает. Забыть его можно в разделе «Синхронизация».' }),
   ]);
 }
 
@@ -864,41 +852,48 @@ function buildSync() {
   ]);
 }
 
-/* -------------------------------- password ------------------------------- */
+/* --------------------------------- access -------------------------------- */
 
-function buildPassword() {
-  const cur = el('input', { type: 'password', autocomplete: 'current-password' });
-  const next = el('input', { type: 'password', autocomplete: 'new-password' });
-  const again = el('input', { type: 'password', autocomplete: 'new-password' });
-  const error = el('p', { class: 'adm-error', role: 'alert' });
+/**
+ * Where the token lives, and how to get rid of it.
+ *
+ * This replaced a "Пароль" tab, and the tab it replaced was a mistake worth
+ * stating plainly: the password was hashed and salted, and the hash still sat
+ * in the same localStorage as the token, one key away, in a public repository.
+ * It guarded nothing, and it looked like it guarded something.
+ */
+function buildAccess() {
+  const cfg = remoteConfig();
+  const mask = (t) => (t.length > 8 ? `${t.slice(0, 4)}…${t.slice(-4)}` : '••••');
 
   return el('div', { class: 'adm-grid adm-grid--one' }, [
-    field('Текущий пароль', cur),
-    field('Новый пароль', next),
-    field('Новый пароль ещё раз', again),
-    error,
-    el('div', { class: 'adm-add__row' }, [
-      el('button', { class: 'primary-btn', type: 'button', text: 'Сменить пароль', onclick: async () => {
-        error.textContent = '';
-        if (next.value !== again.value) {
-          error.textContent = 'Новые пароли не совпадают';
-          return;
-        }
-        try {
-          await admin.changePassword(cur.value, next.value);
-          cur.value = next.value = again.value = '';
-          toast('Пароль изменён', 'ok');
-        } catch (err) {
-          error.textContent = String(err.message || err);
-        }
-      } }),
-      button('Выйти', () => {
-        admin.logout();
-        showGate();
-        toast('Вы вышли из панели', 'info');
-      }),
+    el('div', { class: 'adm-add' }, [
+      el('h3', { text: 'Токен в этом браузере' }),
+      el('p', { class: 'adm-note', text: cfg.token
+        ? `Сохранён: ${mask(cfg.token)}. Панель открывается без ввода.`
+        : 'Не задан — панель попросит токен при следующем открытии.' }),
+      el('div', { class: 'adm-add__row' }, [
+        button(cfg.token ? 'Забыть токен' : 'Ввести токен', () => {
+          if (cfg.token) {
+            disableSync();
+            admin.logout();
+            showGate();
+            renderSync();
+            toast('Токен забыт — панель снова спросит его', 'info');
+          } else {
+            showGate();
+          }
+        }, cfg.token ? 'ghost-btn ghost-btn--danger' : 'primary-btn'),
+      ]),
     ]),
-    el('p', { class: 'adm-note', text: 'Пароль хранится в этом браузере как хеш с солью. Забытый пароль сбрасывается только вместе с настройками — восстановить его нельзя.' }),
+
+    el('div', { class: 'adm-add' }, [
+      el('h3', { text: 'Что здесь вообще защищено' }),
+      el('p', { text: 'Токен — и только он. Он лежит в этом браузере и даёт право записывать каталог в репозиторий. Пока он есть только у вас, изменить музыку на сайте может только он.' }),
+      el('p', { text: 'Пароля у панели нет. Он стоял рядом с токеном в том же хранилище, поэтому не защищал ничего, а выглядел так, будто защищал. Второй замок без первой двери — это не защита, а вид её.' }),
+      el('p', { text: 'Сама панель — не дверь. Дверь — токен: с ним файл каталога пишется напрямую через GitHub, вообще без этого интерфейса.' }),
+      el('p', { text: 'Что делать, если браузер открыт: «Забыть токен» выше. В режиме инкогнито хранилище не переживает закрытие вкладки — токен придётся ввести заново, и это ожидаемо.' }),
+    ]),
   ]);
 }
 
@@ -909,7 +904,7 @@ const TABS = [
   ['music', 'Музыка'],
   ['playlists', 'Плейлисты'],
   ['sync', 'Синхронизация'],
-  ['password', 'Пароль'],
+  ['access', 'Доступ'],
 ];
 
 function showGate() {
@@ -932,8 +927,8 @@ function showPanel() {
   renderMusic();
   renderPlaylists();
   renderSync();
-  renderPassword();
-  /* the add form may have been asked for before the password was typed */
+  renderAccess();
+  /* the add form may have been asked for from the empty shelf */
   if (pendingExpand) {
     pendingExpand = false;
     expandAddForm();
@@ -950,11 +945,11 @@ function expandAddForm() {
   extra.querySelector('input')?.focus();
   return true;
 }
-let passwordHost = null;
-const renderPassword = () => {
+let accessHost = null;
+const renderAccess = () => {
   /* looked up per call: the hosts only exist once the panel is in the DOM */
-  const host = passwordHost || qs('#adm-password');
-  if (host) host.replaceChildren(buildPassword());
+  const host = accessHost || qs('#adm-access');
+  if (host) host.replaceChildren(buildAccess());
 };
 
 const renderSite = () => {
@@ -983,7 +978,7 @@ function switchTab(name) {
   if (name === 'music') renderMusic();
   if (name === 'playlists') renderPlaylists();
   if (name === 'sync') renderSync();
-  if (name === 'password') renderPassword();
+  if (name === 'access') renderAccess();
 }
 
 /**
@@ -1005,11 +1000,18 @@ export function openAdmin(tab = 'site', { expandAdd = false } = {}) {
   if (!root) return;
   open = true;
   qs('#btn-admin')?.setAttribute('aria-expanded', 'true');
-  /* `authed` lives in sessionStorage, which anyone can type into from the
-     console, so it is not a lock on its own. A stored token is. Without one
-     there is nothing to write with, so the gate comes back. */
-  if (admin.authed && remoteWritable()) showPanel();
-  else showGate();
+
+  /* A stored token means signed in. It is the credential: it lives in this
+     browser's storage whether or not the panel is open, and whoever can reach
+     it can write the catalogue through the GitHub API directly. So making
+     someone retype it on every visit guards nothing - it only makes the admin
+     retype a secret to get to a door that secret already unlocked. */
+  if (remoteWritable()) {
+    admin.markAuthed();
+    showPanel();
+  } else {
+    showGate();
+  }
   openSheet(root);
   switchTab(tab);
   if (expandAdd) {
@@ -1041,7 +1043,7 @@ function build() {
           el('section', { 'data-tab': 'music', hidden: true }, [el('div', { id: 'adm-music' })]),
           el('section', { 'data-tab': 'playlists', hidden: true }, [el('div', { id: 'adm-playlists' })]),
           el('section', { 'data-tab': 'sync', hidden: true }, [el('div', { id: 'adm-sync' })]),
-          el('section', { 'data-tab': 'password', hidden: true }, [el('div', { id: 'adm-password' })]),
+          el('section', { 'data-tab': 'access', hidden: true }, [el('div', { id: 'adm-access' })]),
         ]),
       ]),
     ]),
