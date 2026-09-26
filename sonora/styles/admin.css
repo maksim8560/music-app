@@ -365,6 +365,87 @@
   padding: 6px 9px;
 }
 
+/* ------------------------------ playlists ------------------------------- */
+.adm-stack { display: grid; gap: var(--gap-4); }
+
+.adm-pl {
+  display: grid;
+  gap: var(--gap-3);
+  padding: var(--gap-3);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-md, 14px);
+  background: color-mix(in oklab, var(--bg-2) 34%, transparent);
+}
+.adm-pl__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-2);
+}
+.adm-pl-name {
+  flex: 1 1 180px;
+  min-width: 0;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-1);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 6px 9px;
+  transition: border-color var(--d2) var(--ease), background var(--d2) var(--ease);
+}
+.adm-pl-name:hover { border-color: var(--glass-line); }
+.adm-pl-name:focus-visible {
+  outline: none;
+  border-color: var(--accent-a);
+  background: color-mix(in oklab, var(--bg-2) 70%, transparent);
+}
+.adm-pl__count {
+  font-size: var(--t-small);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.adm-pl__tools {
+  display: flex;
+  gap: var(--gap-2);
+  margin-left: auto;
+}
+.adm-pl__tracks {
+  display: grid;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+.adm-pl__track {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--gap-2);
+  padding: 7px 9px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background var(--d2) var(--ease);
+}
+.adm-pl__track:hover { background: color-mix(in oklab, var(--text-1) 7%, transparent); }
+.adm-pl__track input { accent-color: var(--accent-a); width: 15px; height: 15px; }
+.adm-pl__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+}
+.adm-pl__track small {
+  color: var(--text-3);
+  font-size: var(--t-small);
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* -------------------------------- narrow -------------------------------- */
 @media (max-width: 720px) {
   .adm-sections { padding: var(--gap-3); }

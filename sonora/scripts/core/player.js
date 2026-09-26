@@ -113,11 +113,21 @@ class Player {
     let list = this.ordered();
 
     if (filter === 'liked') list = list.filter((t) => likes.has(t.id));
-    else if (filter && filter !== 'all') list = list.filter((t) => t.genreKey === filter);
     else if (filter === 'recent') list = this.recent();
+    else if (typeof filter === 'string' && filter.startsWith('pl:')) {
+      /* a playlist made in the admin panel, addressed by id */
+      const pl = admin.playlist(filter.slice(3));
+      const ids = new Set(pl?.trackIds || []);
+      list = list.filter((t) => ids.has(t.id));
+    } else if (filter && filter !== 'all') list = list.filter((t) => t.genreKey === filter);
 
     if (search) list = list.filter((t) => this.matches(t, search));
     return list;
+  }
+
+  /** The admin playlists a track belongs to — shown as chips on its row. */
+  playlistsOf(trackId) {
+    return admin.playlistsOf(trackId);
   }
 
   recent() {

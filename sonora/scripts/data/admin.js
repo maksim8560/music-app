@@ -60,8 +60,23 @@ const DEFAULTS = () => ({
   hidden: [],
   /* tracks the admin added, by hand or by URL */
   custom: [],
+  /* the admin's own playlists: [{ id, name, trackIds }] */
+  playlists: [],
   updatedAt: 0,
 });
+
+/** Older saves have no playlists; keep the shape honest on the way in. */
+function normalisePlaylists(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((p) => p && typeof p === 'object')
+    .map((p) => ({
+      id: String(p.id || ''),
+      name: String(p.name || 'Без названия'),
+      trackIds: Array.isArray(p.trackIds) ? p.trackIds.filter((x) => typeof x === 'string') : [],
+    }))
+    .filter((p) => p.id);
+}
 
 /* ------------------------------ persistence ------------------------------- */
 
@@ -78,6 +93,7 @@ function read() {
       overrides: saved.overrides || {},
       hidden: Array.isArray(saved.hidden) ? saved.hidden : [],
       custom: Array.isArray(saved.custom) ? saved.custom : [],
+      playlists: normalisePlaylists(saved.playlists),
     };
   } catch {
     return DEFAULTS();
@@ -341,8 +357,90 @@ class Admin {
 
   removeCustom(id) {
     this.#state.custom = this.#state.custom.filter((t) => t.id !== id);
+    /* a deleted track must not leave a hole in someone's playlist */
+    for (const pl of this.#state.playlists) {
+      pl.trackIds = pl.trackIds.filter((x) => x !== id);
+    }
     write(this.#state);
     return this.library();
+  }
+
+  /* ------------------------------ playlists ----------------------------- */
+
+  get playlists() {
+    return this.#state.playlists;
+  }
+
+  /** The filter value a playlist is addressed by inside the player. */
+  static filterOf(id) {
+    return `pl:${id}`;
+  }
+
+  playlist(id) {
+    return this.#state.playlists.find((p) => p.id === id) || null;
+  }
+
+  /** Ids of the playlists a track belongs to. */
+  playlistsOf(trackId) {
+    return this.#state.playlists.filter((p) => p.trackIds.includes(trackId)).map((p) => p.id);
+  }
+
+  #nextPlaylistId() {
+    let n = 1;
+    const taken = new Set(this.#state.playlists.map((p) => p.id));
+    while (taken.has(`pl-${n}`)) n++;
+    return `pl-${n}`;
+  }
+
+  addPlaylist(name) {
+    const clean = (name || '').trim();
+    if (!clean) throw new Error('Дайте плейлисту название');
+    const playlist = { id: this.#nextPlaylistId(), name: clean.slice(0, 40), trackIds: [] };
+    this.#state.playlists.push(playlist);
+    write(this.#state);
+    return playlist;
+  }
+
+  renamePlaylist(id, name) {
+    const pl = this.playlist(id);
+    const clean = (name || '').trim();
+    if (!pl || !clean) return null;
+    pl.name = clean.slice(0, 40);
+    write(this.#state);
+    return pl;
+  }
+
+  removePlaylist(id) {
+    this.#state.playlists = this.#state.playlists.filter((p) => p.id !== id);
+    write(this.#state);
+    return this.#state.playlists;
+  }
+
+  /** Put a track in a playlist, or take it out. @returns {boolean} now in it */
+  setInPlaylist(playlistId, trackId, on) {
+    const pl = this.playlist(playlistId);
+    if (!pl) return false;
+    const has = pl.trackIds.includes(trackId);
+    if (on && !has) pl.trackIds.push(trackId);
+    else if (!on && has) pl.trackIds = pl.trackIds.filter((x) => x !== trackId);
+    else return has;
+    write(this.#state);
+    return on;
+  }
+
+  toggleInPlaylist(playlistId, trackId) {
+    const pl = this.playlist(playlistId);
+    if (!pl) return false;
+    return this.setInPlaylist(playlistId, trackId, !pl.trackIds.includes(trackId));
+  }
+
+  /** Track ids that no longer exist, dropped from every playlist. */
+  prunePlaylists() {
+    const valid = new Set(this.library().map((t) => t.id));
+    for (const pl of this.#state.playlists) {
+      pl.trackIds = pl.trackIds.filter((id) => valid.has(id));
+    }
+    write(this.#state);
   }
 
   /**
@@ -381,6 +479,7 @@ class Admin {
       overrides: data.overrides,
       hidden: data.hidden,
       custom: data.custom,
+      playlists: data.playlists,
     };
     if (Array.isArray(incoming.custom)) {
       for (const t of incoming.custom) if (!t || typeof t.id !== 'string') throw new Error('Повреждённый список треков');
@@ -391,7 +490,10 @@ class Admin {
       overrides: incoming.overrides && typeof incoming.overrides === 'object' ? incoming.overrides : {},
       hidden: Array.isArray(incoming.hidden) ? incoming.hidden.filter((x) => typeof x === 'string') : [],
       custom: (incoming.custom || []).filter((t) => t && typeof t.id === 'string'),
+      playlists: normalisePlaylists(incoming.playlists),
     };
+    /* imported ids may not match what is actually on the shelf */
+    this.prunePlaylists();
     write(this.#state);
     return this.library();
   }
@@ -401,6 +503,7 @@ class Admin {
     this.#state.overrides = {};
     this.#state.hidden = [];
     this.#state.custom = [];
+    this.#state.playlists = [];
     write(this.#state);
     return this.library();
   }

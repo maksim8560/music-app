@@ -9,6 +9,7 @@ import { store } from '../core/store.js';
 import { player } from '../core/player.js';
 import { art } from './artwork.js';
 import { GENRES } from '../data/tracks.js';
+import { admin } from '../data/admin.js';
 import { toast } from './toast.js';
 
 const listEl = document.getElementById('track-list');
@@ -155,6 +156,9 @@ export function renderLibrary() {
 
 function headingFor(filter, search) {
   if (search) return `Поиск: «${search}»`;
+  if (typeof filter === 'string' && filter.startsWith('pl:')) {
+    return admin.playlist(filter.slice(3))?.name || 'Плейлист';
+  }
   return {
     all: 'Все треки',
     liked: 'Избранное',

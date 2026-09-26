@@ -8,6 +8,7 @@ import { store } from './core/store.js';
 import { player } from './core/player.js';
 import { engine } from './audio/engine.js';
 import { renderLibrary, syncLibrary } from './ui/library.js';
+import { renderSidePlaylists } from './ui/sidebar.js';
 import { renderQueue } from './ui/queue.js';
 import { initTransport, syncTrack, syncState, syncVolume, syncLike } from './ui/transport.js';
 import { initPalette, open as openPalette, paletteShortcut } from './ui/palette.js';
@@ -79,6 +80,8 @@ function flush() {
   if (has('likes')) syncLike();
   if (has('settings')) applyTheme();
   if (has('order', 'queue', 'likes', 'currentId', 'filter')) updateCounters();
+  /* the admin may have added or removed a playlist since the last frame */
+  renderSidePlaylists();
 }
 
 /* ==========================================================================
@@ -132,10 +135,11 @@ function initNav() {
     });
   });
 
-  qsa('#side-playlists [data-filter]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      player.setFilter(btn.dataset.filter);
-    });
+  /* Delegated, because the admin's own playlists are re-rendered into this list
+     whenever they change — handlers bound per button would die with the nodes. */
+  on(qs('#side-playlists'), 'click', (e) => {
+    const btn = e.target.closest('[data-filter]');
+    if (btn) player.setFilter(btn.dataset.filter);
   });
 
   /* list ⇄ grid */
@@ -156,6 +160,8 @@ function initNav() {
     const filter = store.get('filter');
     qsa('#side-playlists [data-filter]').forEach((b) => b.classList.toggle('is-active', b.dataset.filter === filter));
   });
+
+  renderSidePlaylists();
 
   /* search */
   const search = qs('#search');

@@ -14,7 +14,7 @@
    password is a local lock, not a security boundary.
    ========================================================================== */
 
-import { on, qs, qsa } from '../core/dom.js';
+import { on, qs, qsa, plural } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
 import { admin } from '../data/admin.js';
@@ -24,6 +24,7 @@ import { openSheet, closeSheet, initSheet } from './sheet.js';
 import { art } from './artwork.js';
 import { toast } from './toast.js';
 import { applyTheme } from './settings.js';
+import { renderSidePlaylists } from './sidebar.js';
 
 const SCALE_LABELS = {
   minor: 'До минор',
@@ -214,23 +215,26 @@ function buildSite() {
 let addFormOpen = false;
 
 function trackRow(track) {
-  const edited = admin.isEdited(track.id);
   const custom = !!track.custom;
   const isStream = track.source === 'stream';
   const isUrl = track.source === 'url' || isStream;
 
+  const titleEl = el('b', { text: track.title });
+  const idEl = el('small', { text: `${track.artist} · ${track.id}` });
+  const tagsEl = el('div', { class: 'adm-track__tags' });
+  const paintTags = () => {
+    tagsEl.replaceChildren();
+    if (custom) tagsEl.append(el('span', { class: 'adm-tag adm-tag--own', text: 'своя' }));
+    if (isStream) tagsEl.append(el('span', { class: 'adm-tag adm-tag--url', text: 'радио' }));
+    else if (isUrl) tagsEl.append(el('span', { class: 'adm-tag adm-tag--url', text: 'ссылка' }));
+    if (admin.isEdited(track.id)) tagsEl.append(el('span', { class: 'adm-tag', text: 'изменён' }));
+  };
+  paintTags();
+
   const head = el('div', { class: 'adm-track__head' }, [
     el('span', { class: `adm-dot adm-dot--${track.genreKey || 'local'}` }),
-    el('div', { class: 'adm-track__id' }, [
-      el('b', { text: track.title }),
-      el('small', { text: `${track.artist} · ${track.id}` }),
-    ]),
-    el('div', { class: 'adm-track__tags' }, [
-      custom ? el('span', { class: 'adm-tag adm-tag--own', text: 'своя' }) : null,
-      isStream ? el('span', { class: 'adm-tag adm-tag--url', text: 'радио' }) : null,
-      isUrl && !isStream ? el('span', { class: 'adm-tag adm-tag--url', text: 'ссылка' }) : null,
-      edited ? el('span', { class: 'adm-tag', text: 'изменён' }) : null,
-    ]),
+    el('div', { class: 'adm-track__id' }, [titleEl, idEl]),
+    tagsEl,
     button('Сбросить', () => {
       admin.resetTrack(track.id);
       renderMusic();
@@ -238,9 +242,19 @@ function trackRow(track) {
     }, 'ghost-btn ghost-btn--sm'),
   ]);
 
+  /**
+   * Persist an edit and refresh only what the row itself shows.
+   *
+   * This used to rebuild the whole music section on every keystroke, which
+   * destroyed the very field being typed into — the caret jumped out after the
+   * first character and the field had to be clicked again for every letter. The
+   * row is cheap to update in place, and the player is told separately.
+   */
   const apply = (patch) => {
     admin.updateTrack(track.id, patch);
-    renderMusic();
+    if ('title' in patch) titleEl.textContent = track.title;
+    if ('artist' in patch) idEl.textContent = `${track.artist} · ${track.id}`;
+    paintTags();
     catalogueChanged();
   };
 
@@ -452,6 +466,104 @@ function renderMusic() {
   );
 }
 
+/* ------------------------------- playlists ------------------------------- */
+
+/**
+ * Create, rename, delete — and fill. Every playlist shows the whole shelf as
+ * checkboxes, so filling one does not mean hunting for the right row first.
+ */
+function buildPlaylists() {
+  const draft = { name: '' };
+  const error = el('p', { class: 'adm-error', role: 'alert' });
+  const tracks = admin.library();
+
+  const create = el('div', { class: 'adm-add' }, [
+    el('h3', { text: 'Новый плейлист' }),
+    el('div', { class: 'adm-grid adm-grid--one' }, [
+      field('Название', input(draft.name, (v) => { draft.name = v; }, { placeholder: 'Для дороги', maxlength: '40' }),
+        'Плейлист появится в списке слева и откроет свою подборку.'),
+    ]),
+    error,
+    el('div', { class: 'adm-add__row' }, [
+      el('button', { class: 'primary-btn', type: 'button', text: 'Создать', onclick: () => {
+        error.textContent = '';
+        try {
+          admin.addPlaylist(draft.name);
+          renderPlaylists();
+          renderSidePlaylists();
+          player.reconcile();
+        } catch (err) {
+          error.textContent = String(err.message || err);
+        }
+      } }),
+    ]),
+  ]);
+
+  const list = admin.playlists.map((pl) => {
+    const name = el('input', { class: 'adm-pl-name', value: pl.name, maxlength: '40' });
+    name.addEventListener('input', () => admin.renamePlaylist(pl.id, name.value));
+    name.addEventListener('change', () => {
+      renderSidePlaylists();
+      player.reconcile();
+    });
+
+    const items = tracks.length
+      ? tracks.map((t) => {
+        const box = el('input', { type: 'checkbox', checked: pl.trackIds.includes(t.id) });
+        box.addEventListener('change', () => {
+          admin.toggleInPlaylist(pl.id, t.id);
+          count.textContent = countFor(pl.id);
+          renderSidePlaylists();
+          player.reconcile();
+        });
+        return el('label', { class: 'adm-pl__track' }, [
+          box,
+          el('span', { class: 'adm-pl__title', text: t.title }),
+          el('small', { text: t.artist }),
+        ]);
+      })
+      : [el('p', { class: 'adm-note', text: 'Треков пока нет — добавьте их на вкладке «Музыка».' })];
+
+    const count = el('span', { class: 'adm-pl__count' });
+    const countFor = (id) => {
+      const n = admin.playlist(id)?.trackIds.length || 0;
+      /* plural() already renders the number with the word */
+      return n ? plural(n, 'трек', 'трека', 'треков') : 'пусто';
+    };
+    count.textContent = countFor(pl.id);
+
+    return el('div', { class: 'adm-pl' }, [
+      el('div', { class: 'adm-pl__head' }, [
+        name,
+        count,
+        el('div', { class: 'adm-pl__tools' }, [
+          button('Показать', () => {
+            player.setFilter(`pl:${pl.id}`);
+            close();
+            toast(`Открыт плейлист «${admin.playlist(pl.id)?.name || pl.name}»`, 'info', 3000);
+          }, 'ghost-btn ghost-btn--sm'),
+          button('Удалить', () => {
+            if (!confirm(`Удалить плейлист «${pl.name}»? Сами треки останутся на полке.`)) return;
+            admin.removePlaylist(pl.id);
+            if (store.get('filter') === `pl:${pl.id}`) player.setFilter('all');
+            renderPlaylists();
+            renderSidePlaylists();
+            player.reconcile();
+          }, 'ghost-btn ghost-btn--sm ghost-btn--danger'),
+        ]),
+      ]),
+      el('div', { class: 'adm-pl__tracks' }, items),
+    ]);
+  });
+
+  return el('div', { class: 'adm-stack' }, [
+    create,
+    list.length
+      ? el('div', { class: 'adm-tracks' }, list)
+      : el('p', { class: 'adm-note', text: 'Плейлистов пока нет. Создайте первый — он появится в боковом меню.' }),
+  ]);
+}
+
 /* -------------------------------- password ------------------------------- */
 
 function buildPassword() {
@@ -495,6 +607,7 @@ function buildPassword() {
 const TABS = [
   ['site', 'Сайт'],
   ['music', 'Музыка'],
+  ['playlists', 'Плейлисты'],
   ['password', 'Пароль'],
 ];
 
@@ -516,6 +629,7 @@ function showPanel() {
   setBadge('on');
   renderSite();
   renderMusic();
+  renderPlaylists();
   renderPassword();
   /* the add form may have been asked for before the password was typed */
   if (pendingExpand) {
@@ -546,6 +660,11 @@ const renderSite = () => {
   if (host) host.replaceChildren(buildSite());
 };
 
+const renderPlaylists = () => {
+  const host = qs('#adm-playlists');
+  if (host) host.replaceChildren(buildPlaylists());
+};
+
 function switchTab(name) {
   for (const btn of qsa('#adm-tabs button')) {
     btn.classList.toggle('is-active', btn.dataset.tab === name);
@@ -555,6 +674,7 @@ function switchTab(name) {
   }
   if (name === 'site') renderSite();
   if (name === 'music') renderMusic();
+  if (name === 'playlists') renderPlaylists();
   if (name === 'password') renderPassword();
 }
 
@@ -600,6 +720,7 @@ function build() {
         el('div', { class: 'adm-sections', id: 'adm-sections' }, [
           el('section', { 'data-tab': 'site' }, [el('div', { class: 'adm-section__body', id: 'adm-site' })]),
           el('section', { 'data-tab': 'music', hidden: true }, [el('div', { id: 'adm-music' })]),
+          el('section', { 'data-tab': 'playlists', hidden: true }, [el('div', { id: 'adm-playlists' })]),
           el('section', { 'data-tab': 'password', hidden: true }, [el('div', { id: 'adm-password' })]),
         ]),
       ]),
