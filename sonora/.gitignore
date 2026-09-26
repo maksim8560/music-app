@@ -1,0 +1,9 @@
+# nothing to ignore: the project has no dependencies and no node_modules.
+# Kept so an accidental one never gets committed.
+
+node_modules/
+npm-debug.log*
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak

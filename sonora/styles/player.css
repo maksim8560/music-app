@@ -1,0 +1,325 @@
+/* ==========================================================================
+   Sonora · player — artwork, transport, seek, visualisers, now-playing
+   ========================================================================== */
+
+/* ----------------------------- artwork ---------------------------------- */
+.art {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--fill-1);
+  box-shadow:
+    0 30px 70px -24px rgba(0, 0, 0, 0.72),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-spec);
+  isolation: isolate;
+}
+
+.art canvas { width: 100%; height: 100%; display: block; }
+
+.art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--glass-line-2), inset 0 -30px 60px -40px rgba(0, 0, 0, 0.7);
+}
+
+.art__sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.26) 0%, transparent 34%, transparent 66%, rgba(255, 255, 255, 0.08) 100%);
+  mix-blend-mode: soft-light;
+  opacity: 0.85;
+}
+
+.art--xl {
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 1;
+  border-radius: var(--r-xl);
+  animation: art-float 12s var(--ease-soft) infinite;
+}
+
+@keyframes art-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-7px) rotate(0.35deg); }
+}
+
+.art--sm {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  flex: none;
+  box-shadow: var(--shadow-2), inset 0 1px 0 var(--glass-spec);
+}
+
+.art__badge {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35), 0 0 8px var(--accent-glow);
+  transition: background var(--d2) var(--ease);
+}
+
+.is-paused .art__badge { background: var(--text-4); box-shadow: none; }
+
+/* progress ring drawn over the hero artwork */
+.art__ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--d3) var(--ease);
+}
+
+.art--xl .art__ring { opacity: 1; }
+.art__ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+.ring__bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 1.6;
+}
+
+.ring__fg {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-dasharray: 292.2;
+  stroke-dashoffset: 292.2;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.55));
+  transition: stroke-dashoffset 120ms linear;
+}
+
+/* big hover-to-play overlay on hero art */
+.art__play {
+  position: absolute;
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  color: #0a0a12;
+  background: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.8), inset 0 1px 0 #fff;
+  opacity: 0;
+  scale: 0.8;
+  transition: opacity var(--d3) var(--ease), scale var(--d3) var(--ease-back);
+}
+
+.art--xl:hover .art__play,
+.art--xl:focus-within .art__play { opacity: 1; scale: 1; }
+.art__play svg { fill: currentColor; stroke: none; margin-left: 3px; }
+.art__play:hover { scale: 1.06; }
+.is-playing .art__play { opacity: 0; scale: 0.8; }
+
+/* ---------------------------- transport --------------------------------- */
+.transport {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-3);
+}
+
+.transport--compact { gap: 4px; }
+
+.play-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  flex: none;
+  border-radius: 50%;
+  color: var(--accent-ink);
+  background: var(--accent-grad);
+  box-shadow:
+    0 16px 40px -14px color-mix(in oklab, var(--accent-a) 85%, transparent),
+    0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-spec);
+  transition: transform var(--d2) var(--ease-back), box-shadow var(--d3) var(--ease);
+}
+
+.play-btn svg { fill: currentColor; stroke: none; }
+.play-btn .ico-pause,
+.play-btn.is-playing .ico-play { display: none; }
+.play-btn.is-playing .ico-pause { display: block; }
+.play-btn .ico-play { margin-left: 3px; }
+.play-btn .ico-pause { margin-left: 0; }
+.play-btn:hover { transform: scale(1.06); }
+.play-btn:active { transform: scale(0.95); }
+
+.play-btn--sm { width: 42px; height: 42px; }
+
+.play-btn__pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle, transparent 58%, color-mix(in oklab, var(--accent-a) 42%, transparent));
+}
+
+.is-playing .play-btn__pulse { animation: pulse 2.4s var(--ease-soft) infinite; }
+
+@keyframes pulse {
+  0%   { opacity: 0.5; scale: 0.94; }
+  70%  { opacity: 0; scale: 1.22; }
+  100% { opacity: 0; scale: 1.22; }
+}
+
+/* ------------------------------ seek ------------------------------------ */
+.seek { display: grid; gap: 2px; width: 100%; max-width: 620px; }
+
+.seek__labels {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.seek__labels time:last-of-type { margin-left: auto; }
+.seek__labels time { min-width: 3.4em; }
+.seek__labels time:first-of-type { text-align: left; }
+
+.seek__badge {
+  margin-left: var(--gap-2);
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: var(--fill-1);
+}
+
+/* --------------------------- visualiser --------------------------------- */
+.viz {
+  width: 100%;
+  max-width: 400px;
+  height: 74px;
+  margin-top: calc(var(--gap-2) * -1);
+  opacity: 0.9;
+}
+
+.mini-viz {
+  width: 220px;
+  height: 34px;
+  opacity: 0.85;
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+/* sidebar mini spectrum */
+.spectrum-mini i:nth-child(odd) { background: var(--accent-b); opacity: 0.4; }
+
+/* --------------------------- now playing -------------------------------- */
+.np {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-3);
+  min-width: 0;
+  padding: 4px;
+  border-radius: var(--r-md);
+  transition: background var(--d1) var(--ease-soft);
+}
+
+.np:hover { background: var(--fill-1); }
+.np__text { display: grid; gap: 1px; min-width: 0; }
+
+.np__text b {
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 30vw;
+}
+
+.np__text span {
+  font-size: var(--t-small);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 30vw;
+}
+
+.volume { display: flex; align-items: center; gap: 6px; width: 132px; flex: none; }
+.volume .range { flex: 1; min-width: 56px; }
+
+.np.is-loading .art--sm::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(100deg, transparent 20%, var(--glass-spec) 50%, transparent 80%);
+  background-size: 220% 100%;
+  animation: shimmer 1.3s linear infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 140% 0; }
+  to   { background-position: -40% 0; }
+}
+
+/* -------------------------- entrance motion ----------------------------- */
+.reveal { animation: reveal var(--d4) var(--ease) both; }
+
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(22px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+.stagger > * {
+  animation: reveal-up var(--d3) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 42ms + 60ms);
+}
+
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* track swap animation for the hero text */
+.swap { animation: swap var(--d3) var(--ease) both; }
+
+@keyframes swap {
+  from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+/* spinner for pending states */
+.spin {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.6px solid var(--glass-line-2);
+  border-top-color: var(--accent-a);
+  animation: spin 720ms linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* when nothing is playing, the play bar reads as dormant — only the
+   position slider and the volume are inert, the transport always works */
+.playbar[data-idle="true"] .playbar__progress,
+.playbar[data-idle="true"] .volume { opacity: 0.45; pointer-events: none; }

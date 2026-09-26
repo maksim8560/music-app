@@ -1,0 +1,375 @@
+/* ==========================================================================
+   admin.css — the admin sheet
+   Kept in its own file: the panel is optional UI, and nothing here is allowed
+   to change the look or the cost of the player itself.
+   ========================================================================== */
+
+/* the admin's background image sits between the live canvas and the veil, so
+   it gets the same dimming as everything else */
+.stage__image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity var(--d3) var(--ease);
+  pointer-events: none;
+}
+.stage__image[data-on="true"] { opacity: 0.5; }
+
+/* --------------------------------- sheet -------------------------------- */
+.sheet__panel--admin {
+  width: min(880px, 100%);
+  max-width: 100%;
+  max-height: min(88dvh, 900px);
+  gap: 0;
+}
+
+/* The panel is a flex column with a max-height, so the body has to be allowed
+   to shrink — otherwise it sizes to its content and the list spills out of the
+   panel instead of scrolling inside it. */
+#adm-body,
+.adm-gate-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.adm-gate-host { overflow-y: auto; }
+
+.adm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: var(--t-small);
+  color: var(--text-3);
+  background: color-mix(in oklab, var(--text-1) 8%, transparent);
+  border: 1px solid var(--glass-line);
+}
+.adm-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.adm-badge[data-state="on"] {
+  color: var(--accent-ink);
+  background: color-mix(in oklab, var(--accent-a) 22%, transparent);
+}
+
+/* --------------------------------- gate --------------------------------- */
+.adm-gate {
+  display: grid;
+  gap: var(--gap-3);
+  max-width: 420px;
+  margin: 0 auto;
+  padding: var(--gap-5) var(--gap-4);
+  text-align: center;
+}
+.adm-gate .adm-field { text-align: left; }
+.adm-gate__lead {
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.adm-gate__row {
+  display: flex;
+  gap: var(--gap-2);
+  justify-content: center;
+}
+
+/* --------------------------------- tabs --------------------------------- */
+.adm-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 var(--gap-4);
+  border-bottom: 1px solid var(--glass-line);
+}
+.adm-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: var(--t-small);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 11px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--d2) var(--ease), border-color var(--d2) var(--ease);
+}
+.adm-tab:hover { color: var(--text-1); }
+.adm-tab.is-active {
+  color: var(--text-1);
+  border-bottom-color: var(--accent-a);
+}
+
+.adm-sections {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--gap-4);
+  display: grid;
+  gap: var(--gap-4);
+  align-content: start;
+}
+
+/* -------------------------------- fields -------------------------------- */
+.adm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--gap-3);
+}
+.adm-grid--tight { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.adm-grid--one { grid-template-columns: minmax(0, 320px); }
+.adm-grid--split { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+
+.adm-field textarea {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text-1);
+  background: color-mix(in oklab, var(--bg-2) 70%, transparent);
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  resize: vertical;
+  transition: border-color var(--d2) var(--ease), background var(--d2) var(--ease);
+}
+.adm-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent-a);
+  background: color-mix(in oklab, var(--bg-2) 92%, transparent);
+}
+
+/* -------------------------------- covers -------------------------------- */
+.adm-cover {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--glass-line);
+  background: color-mix(in oklab, var(--bg-2) 60%, transparent);
+  flex: none;
+}
+.adm-cover img,
+.adm-cover__gen {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.adm-cover span {
+  font-size: 10px;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--text-3);
+  padding: 4px;
+}
+.adm-cover--preview {
+  width: 72px;
+  height: 72px;
+}
+.adm-cover-row {
+  display: flex;
+  gap: var(--gap-3);
+  align-items: center;
+}
+
+.adm-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.adm-field__label {
+  font-size: var(--t-small);
+  color: var(--text-3);
+  letter-spacing: 0.01em;
+}
+.adm-field__hint {
+  color: var(--text-3);
+  opacity: 0.75;
+  line-height: 1.4;
+}
+.adm-field input,
+.adm-field select {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text-1);
+  background: color-mix(in oklab, var(--bg-2) 70%, transparent);
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  transition: border-color var(--d2) var(--ease), background var(--d2) var(--ease);
+}
+.adm-field input:focus-visible,
+.adm-field select:focus-visible {
+  outline: none;
+  border-color: var(--accent-a);
+  background: color-mix(in oklab, var(--bg-2) 92%, transparent);
+}
+
+.adm-error {
+  color: var(--danger, #ff6b6b);
+  font-size: var(--t-small);
+  min-height: 1em;
+}
+.adm-error:empty { min-height: 0; }
+
+.adm-note {
+  color: var(--text-3);
+  font-size: var(--t-small);
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
+/* ------------------------------- toolbar -------------------------------- */
+.adm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-2);
+  align-items: center;
+  padding-bottom: var(--gap-2);
+  border-bottom: 1px solid var(--glass-line);
+}
+.ghost-btn--sm {
+  padding: 5px 10px;
+  font-size: var(--t-small);
+}
+.ghost-btn--danger {
+  color: var(--danger, #ff6b6b);
+}
+
+.adm-extra {
+  display: grid;
+  gap: var(--gap-3);
+}
+.adm-add {
+  display: grid;
+  gap: var(--gap-3);
+  padding: var(--gap-3);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-md, 14px);
+  background: color-mix(in oklab, var(--bg-2) 45%, transparent);
+}
+.adm-add h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.adm-add__row {
+  display: flex;
+  gap: var(--gap-2);
+  flex-wrap: wrap;
+}
+
+/* -------------------------------- tracks -------------------------------- */
+.adm-tracks {
+  display: grid;
+  gap: var(--gap-3);
+}
+
+.adm-track {
+  display: grid;
+  gap: var(--gap-3);
+  padding: var(--gap-3);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-md, 14px);
+  background: color-mix(in oklab, var(--bg-2) 34%, transparent);
+}
+.adm-track__head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  min-width: 0;
+}
+.adm-track__id {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+.adm-track__id b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.adm-track__id small {
+  color: var(--text-3);
+  font-size: var(--t-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.adm-track__tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.adm-tag {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: var(--text-3);
+  border: 1px solid var(--glass-line);
+}
+.adm-tag--own { color: var(--accent-ink); border-color: color-mix(in oklab, var(--accent-a) 50%, transparent); }
+.adm-tag--url { color: #7cc7ff; border-color: color-mix(in oklab, #7cc7ff 40%, transparent); }
+
+.adm-track__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-2);
+  align-items: center;
+  padding-top: var(--gap-2);
+  border-top: 1px solid var(--glass-line);
+}
+
+.adm-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dot, var(--text-3));
+}
+.adm-dot--ambient { --dot: #7c8cff; }
+.adm-dot--lofi { --dot: #ffb26b; }
+.adm-dot--electronic { --dot: #63f5d2; }
+.adm-dot--neo { --dot: #d79bff; }
+.adm-dot--local { --dot: var(--text-3); }
+
+.adm-url code {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-small);
+  color: var(--text-3);
+  background: color-mix(in oklab, var(--bg-2) 60%, transparent);
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  padding: 6px 9px;
+}
+
+/* -------------------------------- narrow -------------------------------- */
+@media (max-width: 720px) {
+  .adm-sections { padding: var(--gap-3); }
+  .adm-grid { grid-template-columns: minmax(0, 1fr); }
+  .adm-grid--tight { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  .adm-grid--split { grid-template-columns: minmax(0, 1fr); }
+  .adm-track__head { flex-wrap: wrap; }
+}

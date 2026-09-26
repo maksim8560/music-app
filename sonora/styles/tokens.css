@@ -1,0 +1,141 @@
+/* ==========================================================================
+   Sonora · design tokens
+   Single source of truth for colour, rhythm, motion and depth.
+   ========================================================================== */
+
+:root {
+  /* ---- type ---- */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", "Cascadia Mono",
+    Menlo, Consolas, monospace;
+
+  --t-display: clamp(2.4rem, 5.4vw, 4.15rem);
+  --t-title:   clamp(1.5rem, 2.4vw, 2.05rem);
+  --t-section: 1.02rem;
+  --t-body:    0.95rem;
+  --t-small:   0.82rem;
+  --t-micro:   0.71rem;
+
+  /* ---- rhythm ---- */
+  --gap-1: 6px;
+  --gap-2: 10px;
+  --gap-3: 16px;
+  --gap-4: 24px;
+  --gap-5: 34px;
+
+  --r-xs: 10px;
+  --r-sm: 14px;
+  --r-md: 18px;
+  --r-lg: 24px;
+  --r-xl: 32px;
+  --r-pill: 999px;
+
+  /* ---- motion ---- */
+  --ease:      cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --d1: 0.16s;
+  --d2: 0.3s;
+  --d3: 0.55s;
+  --d4: 0.85s;
+
+  /* ---- accent (overridden per theme) ---- */
+  --accent-a: #7c8cff;
+  --accent-b: #c07cff;
+  --accent-ink: #ffffff;
+
+  --sidebar-w: 268px;
+  --bar-h: 92px;
+  --z-stage: 0;
+  --z-app: 1;
+  --z-bar: 40;
+  --z-sheet: 60;
+  --z-palette: 80;
+  --z-toast: 90;
+}
+
+/* ------------------------------- dark ---------------------------------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #06060a;
+  --bg-2: #0b0b12;
+
+  --text: rgba(255, 255, 255, 0.94);
+  --text-2: rgba(255, 255, 255, 0.62);
+  --text-3: rgba(255, 255, 255, 0.38);
+  --text-4: rgba(255, 255, 255, 0.22);
+
+  --glass: rgba(255, 255, 255, 0.055);
+  --glass-2: rgba(255, 255, 255, 0.085);
+  --glass-3: rgba(255, 255, 255, 0.13);
+  --glass-line: rgba(255, 255, 255, 0.1);
+  --glass-line-2: rgba(255, 255, 255, 0.16);
+  --glass-spec: rgba(255, 255, 255, 0.22);
+  /* 26px instead of 42px: the backdrop is repainting ~24x/s and every glass
+     surface re-composites its blur on each repaint. Visually near-identical. */
+  --glass-blur: 26px;
+
+  --fill-1: rgba(255, 255, 255, 0.045);
+  --fill-2: rgba(255, 255, 255, 0.085);
+  --fill-3: rgba(255, 255, 255, 0.14);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 28px 60px -18px rgba(0, 0, 0, 0.72), 0 2px 10px rgba(0, 0, 0, 0.4);
+  --shadow-4: 0 44px 100px -30px rgba(0, 0, 0, 0.85);
+
+  --grain-opacity: 0.42;
+  --veil: radial-gradient(120% 80% at 50% -10%, transparent 30%, rgba(0, 0, 0, 0.55) 100%);
+  --track-ink: 255, 255, 255;
+}
+
+/* ------------------------------- light --------------------------------- */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #eef0f6;
+  --bg-2: #f7f8fc;
+
+  --text: rgba(12, 14, 26, 0.92);
+  --text-2: rgba(12, 14, 26, 0.6);
+  --text-3: rgba(12, 14, 26, 0.42);
+  --text-4: rgba(12, 14, 26, 0.24);
+
+  --glass: rgba(255, 255, 255, 0.52);
+  --glass-2: rgba(255, 255, 255, 0.68);
+  --glass-3: rgba(255, 255, 255, 0.86);
+  --glass-line: rgba(12, 14, 26, 0.08);
+  --glass-line-2: rgba(12, 14, 26, 0.12);
+  --glass-spec: rgba(255, 255, 255, 0.95);
+  --glass-blur: 26px;
+
+  --fill-1: rgba(12, 14, 26, 0.035);
+  --fill-2: rgba(12, 14, 26, 0.06);
+  --fill-3: rgba(12, 14, 26, 0.1);
+
+  --shadow-1: 0 1px 2px rgba(20, 24, 48, 0.06);
+  --shadow-2: 0 10px 26px -12px rgba(20, 24, 48, 0.22);
+  --shadow-3: 0 26px 56px -20px rgba(20, 24, 48, 0.3), 0 1px 3px rgba(20, 24, 48, 0.08);
+  --shadow-4: 0 40px 90px -34px rgba(20, 24, 48, 0.4);
+
+  --grain-opacity: 0.28;
+  --veil: radial-gradient(120% 80% at 50% -10%, transparent 40%, rgba(120, 128, 168, 0.22) 100%);
+  --track-ink: 12, 14, 26;
+}
+
+/* ----------------------------- accents -------------------------------- */
+[data-accent="aurora"]   { --accent-a: #7c8cff; --accent-b: #c07cff; --accent-ink: #fff; }
+[data-accent="ember"]    { --accent-a: #ff8f4d; --accent-b: #ff4c8a; --accent-ink: #2a0a12; }
+[data-accent="lagoon"]   { --accent-a: #2fc9ff; --accent-b: #2affc3; --accent-ink: #04202a; }
+[data-accent="grape"]    { --accent-a: #b06bff; --accent-b: #6b8cff; --accent-ink: #fff; }
+
+/* Accent tint used by gradients, glows, focus rings */
+:root {
+  --accent-grad: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  --accent-soft: color-mix(in oklab, var(--accent-a) 22%, transparent);
+  --accent-glow: color-mix(in oklab, var(--accent-b) 42%, transparent);
+  --ring: color-mix(in oklab, var(--accent-a) 62%, transparent);
+}

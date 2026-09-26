@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark" data-accent="aurora">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="Sonora — стеклянный аудиоплеер с генеративной музыкой, живой визуализацией и адаптивным интерфейсом.">
+<meta name="theme-color" content="#07070c">
+<title>Sonora — Glass Audio Player</title>
+
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/layout.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/player.css">
+<link rel="stylesheet" href="styles/admin.css">
+
+<link rel="modulepreload" href="scripts/main.js">
+<link rel="modulepreload" href="scripts/core/store.js">
+<link rel="modulepreload" href="scripts/audio/engine.js">
+</head>
+<body>
+
+<!-- ============================ ICON SPRITE ============================ -->
+<svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.2-6.8a1.1 1.1 0 0 0 0-1.8L9.6 4.3A1 1 0 0 0 8 5.2Z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M7.4 4.6c-.8 0-1.4.6-1.4 1.4v12c0 .8.6 1.4 1.4 1.4h1.5c.8 0 1.4-.6 1.4-1.4V6c0-.8-.6-1.4-1.4-1.4H7.4Zm9.7 0c-.8 0-1.4.6-1.4 1.4v12c0 .8.6 1.4 1.4 1.4h1.5c.8 0 1.4-.6 1.4-1.4V6c0-.8-.6-1.4-1.4-1.4h-1.5Z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18.6 5.2v13.6c0 .8-.9 1.3-1.6.9l-9-6.8a1.1 1.1 0 0 1 0-1.8l9-6.8c.7-.5 1.6 0 1.6.9Z" fill="currentColor" stroke="none"/><path d="M5.6 5.4c.6 0 1 .5 1 1.1v11c0 .6-.4 1.1-1 1.1s-1-.5-1-1.1v-11c0-.6.4-1.1 1-1.1Z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M5.4 5.2v13.6c0 .8.9 1.3 1.6.9l9-6.8a1.1 1.1 0 0 0 0-1.8l-9-6.8c-.7-.5-1.6 0-1.6.9Z" fill="currentColor" stroke="none"/><path d="M18.4 5.4c.6 0 1 .5 1 1.1v11c0 .6-.4 1.1-1 1.1s-1-.5-1-1.1v-11c0-.6.4-1.1 1-1.1Z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M3.5 6.6h3.2c1.5 0 2.3.7 3.1 1.8l4.4 6.2c.8 1.1 1.6 1.8 3.1 1.8h2.2M3.5 17.4h3.2c1.5 0 2.3-.7 3.1-1.8l1.2-1.7M14.4 9.7l.6-.8c.8-1.1 1.6-1.8 3.1-1.8h2.4"/><path d="m18.6 4.6 2.6 2.4-2.6 2.4M18.6 14.6l2.6 2.4-2.6 2.4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M6.6 7.5h10.2c1.5 0 2.6 1.2 2.6 2.6v.6M17.4 16.5H7.2c-1.5 0-2.6-1.2-2.6-2.6v-.6"/><path d="m8.4 5.1-2.8 2.4 2.8 2.4M15.6 18.9l2.8-2.4-2.8-2.4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-repeat-one" viewBox="0 0 24 24"><path d="M6.6 7.5h10.2c1.5 0 2.6 1.2 2.6 2.6v.6M17.4 16.5H7.2c-1.5 0-2.6-1.2-2.6-2.6v-.6"/><path d="m8.4 5.1-2.8 2.4 2.8 2.4M15.6 18.9l2.8-2.4-2.8-2.4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.2 10.4 12.6 9.6v5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.2s-7.4-4.3-7.4-9.3a4.3 4.3 0 0 1 7.4-2.9 4.3 4.3 0 0 1 7.4 2.9c0 5-7.4 9.3-7.4 9.3Z"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.4h2.8c.5 0 1-.2 1.3-.5l3-2.6c.6-.5 1.4-.1 1.4.6v10.2c0 .7-.8 1.1-1.4.6l-3-2.6c-.3-.3-.8-.5-1.3-.5H4a1 1 0 0 1-1-1V10.4a1 1 0 0 1 1-1Z" fill="currentColor" stroke="none"/><path d="M15.6 9.4a3.6 3.6 0 0 1 0 5.2M18.3 7a7 7 0 0 1 0 10" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-volume-low" viewBox="0 0 24 24"><path d="M4 9.4h2.8c.5 0 1-.2 1.3-.5l3-2.6c.6-.5 1.4-.1 1.4.6v10.2c0 .7-.8 1.1-1.4.6l-3-2.6c-.3-.3-.8-.5-1.3-.5H4a1 1 0 0 1-1-1V10.4a1 1 0 0 1 1-1Z" fill="currentColor" stroke="none"/><path d="M15.6 9.4a3.6 3.6 0 0 1 0 5.2" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.4h2.8c.5 0 1-.2 1.3-.5l3-2.6c.6-.5 1.4-.1 1.4.6v10.2c0 .7-.8 1.1-1.4.6l-3-2.6c-.3-.3-.8-.5-1.3-.5H4a1 1 0 0 1-1-1V10.4a1 1 0 0 1 1-1Z" fill="currentColor" stroke="none"/><path d="m16 9.8 4.4 4.4M20.4 9.8 16 14.2" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.4"/><path d="m15.8 15.8 4 4" stroke-linecap="round"/></symbol>
+    <symbol id="i-queue" viewBox="0 0 24 24"><path d="M4 6.5h11M4 11.5h11M4 16.5h7" stroke-linecap="round"/><path d="M17.2 13.2v6.1" stroke-width="1.7" stroke-linecap="round"/><circle cx="19.4" cy="18.1" r="2.1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 4.5v15M12 4.5v15M19 4.5v15" stroke-linecap="round" stroke-width="1.6"/><circle cx="5" cy="9.4" r="2.1" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="2.1" fill="currentColor" stroke="none"/><circle cx="19" cy="8" r="2.1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.2v13.6M5.2 12h13.6" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.4 6.4 11.2 11.2M17.6 6.4 6.4 17.6" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5.2 12.6 4.4 4.4 9.2-10" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5.5 7 6.5-7 6.5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.4 8.4 0 0 1 9.8 4a8.4 8.4 0 1 0 10.2 10.2Z"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h1.8M7.4 7.2v9.6M11.6 3.8v16.4M15.8 8.8v6.4M20.2 11v2" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18.2V6.4l9-1.8v11.4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.6" cy="18.4" r="2.6"/><circle cx="15.6" cy="16.4" r="2.6"/></symbol>
+    <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 3.6a8.4 8.4 0 0 1 0 16.8" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.7" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.4c.5 4.3 2.3 6.1 6.6 6.6-4.3.5-6.1 2.3-6.6 6.6-.5-4.3-2.3-6.1-6.6-6.6 4.3-.5 6.1-2.3 6.6-6.6Z"/><path d="M18.4 15.2c.2 1.9 1 2.7 2.9 2.9-1.9.2-2.7 1-2.9 2.9-.2-1.9-1-2.7-2.9-2.9 1.9-.2 2.7-1 2.9-2.9Z" stroke-width="1.4"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.6V4.4M8.2 8.2 12 4.4l3.8 3.8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.8 15v3.2a1.6 1.6 0 0 0 1.6 1.6h11.2a1.6 1.6 0 0 0 1.6-1.6V15" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6.6h16M4 12h16M4 17.4h16" stroke-linecap="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.8 6.8h14.4M9.4 6.8V5.2a1 1 0 0 1 1-1h3.2a1 1 0 0 1 1 1v1.6M6.6 6.8l.8 12a1.2 1.2 0 0 0 1.2 1.1h6.8a1.2 1.2 0 0 0 1.2-1.1l.8-12" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.5" fill="currentColor" stroke="none"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============================ LIVE BACKGROUND ============================ -->
+<div class="stage" aria-hidden="true">
+  <canvas id="bg-canvas" class="stage__canvas"></canvas>
+  <div class="stage__image" id="bg-image" aria-hidden="true"></div>
+  <div class="stage__veil"></div>
+  <div class="stage__grain"></div>
+</div>
+
+<a class="skip-link" href="#library">К содержимому</a>
+
+<div class="app" id="app">
+
+  <!-- ============================ SIDEBAR ============================ -->
+  <aside class="sidebar glass" id="sidebar" aria-label="Навигация">
+    <div class="sidebar__top">
+      <a class="brand" href="#library">
+        <span class="brand__mark"><svg width="18" height="18"><use href="#i-wave"/></svg></span>
+        <span class="brand__text">
+          <b>Sonora</b>
+          <em>Glass Edition</em>
+        </span>
+      </a>
+      <button class="icon-btn sidebar__collapse" id="btn-rail" aria-label="Свернуть панель" title="Свернуть панель">
+        <svg width="18" height="18"><use href="#i-chevron"/></svg>
+      </button>
+    </div>
+
+    <nav class="nav" aria-label="Разделы">
+      <a class="nav__item is-active" href="#library" data-nav>
+        <svg width="18" height="18"><use href="#i-note"/></svg><span>Сейчас играет</span>
+      </a>
+      <a class="nav__item" href="#library" data-nav>
+        <svg width="18" height="18"><use href="#i-grid"/></svg><span>Альбомы</span>
+      </a>
+      <a class="nav__item" href="#library" data-nav>
+        <svg width="18" height="18"><use href="#i-list"/></svg><span>Все треки</span>
+      </a>
+      <a class="nav__item" href="#library" data-nav>
+        <svg width="18" height="18"><use href="#i-heart"/></svg><span>Избранное</span><em class="nav__count" id="nav-like-count">0</em>
+      </a>
+    </nav>
+
+    <div class="sidebar__section">
+      <p class="sidebar__label">Плейлисты</p>
+      <ul class="side-list" id="side-playlists">
+        <li><button class="side-list__item is-active" data-filter="all"><span class="side-list__dot" data-dot="all"></span>Все треки<em id="side-count-all">0</em></button></li>
+        <li><button class="side-list__item" data-filter="ambient"><span class="side-list__dot" data-dot="ambient"></span>Эмбиент</button></li>
+        <li><button class="side-list__item" data-filter="lofi"><span class="side-list__dot" data-dot="lofi"></span>Lo-Fi</button></li>
+        <li><button class="side-list__item" data-filter="electronic"><span class="side-list__dot" data-dot="electronic"></span>Электроника</button></li>
+        <li><button class="side-list__item" data-filter="neo"><span class="side-list__dot" data-dot="neo"></span>Неоклассика</button></li>
+        <li><button class="side-list__item" data-filter="local"><span class="side-list__dot" data-dot="local"></span>Загруженное<em id="side-count-local">0</em></button></li>
+      </ul>
+    </div>
+
+    <div class="sidebar__foot">
+      <div class="spectrum-mini" id="side-spectrum" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <p class="sidebar__hint"><kbd>Space</kbd> пауза · <kbd>⌘K</kbd> поиск</p>
+    </div>
+  </aside>
+
+  <!-- ============================ MAIN ============================ -->
+  <main class="main" id="main">
+
+    <header class="topbar glass" role="search">
+      <div class="search">
+        <svg width="17" height="17" class="search__icon"><use href="#i-search"/></svg>
+        <input id="search" type="search" placeholder="Поиск по трекам, альбомам, жанрам" autocomplete="off" spellcheck="false" aria-label="Поиск">
+        <button class="search__clear" id="search-clear" aria-label="Очистить поиск" hidden><svg width="15" height="15"><use href="#i-close"/></svg></button>
+        <kbd class="search__kbd">/</kbd>
+      </div>
+      <div class="topbar__actions">
+        <button class="pill" id="btn-import"><svg width="16" height="16"><use href="#i-upload"/></svg><span>Загрузить</span></button>
+        <div class="seg" role="group" aria-label="Вид списка">
+          <button class="seg__btn is-active" data-view="list" aria-label="Список"><svg width="16" height="16"><use href="#i-list"/></svg></button>
+          <button class="seg__btn" data-view="grid" aria-label="Плитка"><svg width="16" height="16"><use href="#i-grid"/></svg></button>
+        </div>
+        <button class="icon-btn" id="btn-theme" aria-label="Сменить тему" title="Тема"><svg width="18" height="18"><use href="#i-moon"/></svg></button>
+        <button class="icon-btn" id="btn-admin" aria-label="Админ-панель" title="Админ-панель" aria-expanded="false" aria-haspopup="dialog"><svg width="18" height="18"><use href="#i-sliders"/></svg></button>
+      </div>
+    </header>
+
+    <div class="scroll" id="scroll">
+
+      <!-- ---------- HERO / NOW PLAYING ---------- -->
+      <section class="hero reveal" aria-label="Сейчас играет">
+        <div class="hero__art-wrap">
+          <div class="art art--xl" id="hero-art-wrap">
+            <canvas id="hero-art" width="640" height="640" aria-hidden="true"></canvas>
+            <div class="art__sheen" aria-hidden="true"></div>
+            <div class="art__ring" id="hero-ring" aria-hidden="true">
+              <svg viewBox="0 0 100 100"><circle class="ring__bg" cx="50" cy="50" r="46.5"/><circle class="ring__fg" id="ring-fg" cx="50" cy="50" r="46.5"/></svg>
+            </div>
+            <button class="art__play" id="hero-art-play" aria-label="Воспроизвести">
+              <svg width="26" height="26"><use href="#i-play"/></svg>
+            </button>
+          </div>
+          <canvas class="viz" id="hero-viz" aria-hidden="true"></canvas>
+        </div>
+
+        <div class="hero__body">
+          <div class="hero__eyebrow">
+            <span class="chip chip--live" id="hero-badge"><i class="eq"><b></b><b></b><b></b></i><span>Сейчас играет</span></span>
+            <span class="chip chip--onair" id="hero-onair" hidden><i class="onair-dot"></i>Прямой эфир</span>
+            <span class="hero__meta" id="hero-meta">Ambient · 2026</span>
+          </div>
+          <h1 class="hero__title" id="hero-title">—</h1>
+          <p class="hero__artist" id="hero-artist">—</p>
+          <p class="hero__note" id="hero-note">Выберите трек, чтобы начать прослушивание.</p>
+
+          <div class="seek" id="hero-seek">
+            <input class="range range--seek" id="hero-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Позиция воспроизведения">
+            <div class="seek__labels">
+              <time id="hero-current" datetime="PT0S">0:00</time>
+              <span class="seek__badge" id="hero-quality">Lossless 24/96</span>
+              <time id="hero-duration" datetime="PT0S">0:00</time>
+            </div>
+          </div>
+
+          <div class="transport">
+            <button class="icon-btn" id="btn-shuffle" aria-pressed="false" aria-label="Перемешать" title="Перемешать (S)"><svg width="20" height="20"><use href="#i-shuffle"/></svg></button>
+            <button class="icon-btn" id="btn-prev" aria-label="Предыдущий" title="Предыдущий (K)"><svg width="22" height="22"><use href="#i-prev"/></svg></button>
+            <button class="play-btn" id="btn-play" aria-label="Воспроизвести" title="Play / Pause (Space)">
+              <svg class="ico-play" width="26" height="26"><use href="#i-play"/></svg>
+              <svg class="ico-pause" width="26" height="26"><use href="#i-pause"/></svg>
+              <span class="play-btn__pulse" aria-hidden="true"></span>
+            </button>
+            <button class="icon-btn" id="btn-next" aria-label="Следующий" title="Следующий (L)"><svg width="22" height="22"><use href="#i-next"/></svg></button>
+            <button class="icon-btn" id="btn-repeat" aria-label="Повтор" title="Повтор (R)"><svg width="20" height="20"><use href="#i-repeat"/></svg><em class="badge-one" id="repeat-one">1</em></button>
+            <button class="icon-btn icon-btn--like" id="btn-like" aria-pressed="false" aria-label="В избранное" title="В избранное (L-shift)">
+              <svg width="20" height="20"><use href="#i-heart"/></svg>
+            </button>
+          </div>
+
+          <div class="chips" id="hero-chips" role="group" aria-label="Эквалайзер">
+            <button class="chip" data-eq="flat">Нейтральный</button>
+            <button class="chip is-active" data-eq="warm">Тёплый</button>
+            <button class="chip" data-eq="bright">Яркий</button>
+            <button class="chip" data-eq="air">Воздух</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- CONTENT GRID ---------- -->
+      <div class="content">
+        <section class="panel glass" aria-labelledby="q-title">
+          <div class="panel__head">
+            <h2 id="q-title"><svg width="16" height="16"><use href="#i-queue"/></svg> В очереди</h2>
+            <span class="panel__hint" id="queue-hint">пусто</span>
+          </div>
+          <ul class="queue" id="queue-list" aria-live="polite"></ul>
+          <div class="queue__empty" id="queue-empty">
+            <svg width="18" height="18"><use href="#i-queue"/></svg>
+            <p>Очередь пуста. Включите «Играть дальше» на любом треке.</p>
+          </div>
+        </section>
+
+        <section class="panel glass library" id="library" aria-labelledby="lib-title">
+          <div class="panel__head">
+            <h2 id="lib-title"><svg width="16" height="16"><use href="#i-disc"/></svg> <span id="lib-heading">Все треки</span></h2>
+            <div class="panel__head-tools">
+              <span class="panel__hint" id="lib-count">0 треков</span>
+              <button class="ghost-btn" id="btn-clear-filters" hidden>Сбросить</button>
+            </div>
+          </div>
+          <ul class="tracklist" id="track-list"></ul>
+          <div class="empty" id="empty-state" hidden>
+            <svg width="26" height="26"><use href="#i-search"/></svg>
+            <p id="empty-text">Ничего не найдено</p>
+            <div class="empty__actions">
+              <button class="ghost-btn" id="btn-reset" hidden>Сбросить фильтры</button>
+              <button class="ghost-btn" id="btn-empty-upload">Загрузить файл</button>
+              <button class="primary-btn" id="btn-empty-admin">Добавить музыку</button>
+            </div>
+            <p class="empty__hint" id="empty-hint" hidden>Прямая ссылка на аудиофайл, описание и обложка — из админ-панели.</p>
+          </div>
+        </section>
+      </div>
+
+      <footer class="foot">
+        <span>Sonora · музыка по прямой ссылке, описание и обложки — из админ-панели</span>
+        <span class="foot__dot">·</span>
+        <span id="foot-engine">AudioContext: idle</span>
+      </footer>
+    </div>
+  </main>
+
+  <!-- ============================ BOTTOM BAR ============================ -->
+  <div class="playbar glass" id="playbar" role="region" aria-label="Плеер">
+    <div class="playbar__progress">
+      <input class="range range--bar" id="bar-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Позиция воспроизведения">
+    </div>
+
+    <div class="playbar__inner">
+      <div class="np">
+        <div class="art art--sm" id="bar-art-wrap">
+          <canvas id="bar-art" width="128" height="128" aria-hidden="true"></canvas>
+          <span class="art__badge" aria-hidden="true"></span>
+        </div>
+        <div class="np__text">
+          <b id="bar-title">—</b>
+          <span id="bar-artist">—</span>
+        </div>
+        <button class="icon-btn icon-btn--sm" id="btn-bar-like" aria-pressed="false" aria-label="В избранное"><svg width="17" height="17"><use href="#i-heart"/></svg></button>
+      </div>
+
+      <div class="playbar__center">
+        <div class="transport transport--compact">
+          <button class="icon-btn icon-btn--sm" id="btn-bar-shuffle" aria-pressed="false" aria-label="Перемешать"><svg width="18" height="18"><use href="#i-shuffle"/></svg></button>
+          <button class="icon-btn icon-btn--sm" id="btn-bar-prev" aria-label="Предыдущий"><svg width="20" height="20"><use href="#i-prev"/></svg></button>
+          <button class="play-btn play-btn--sm" id="btn-bar-play" aria-label="Воспроизвести">
+            <svg class="ico-play" width="20" height="20"><use href="#i-play"/></svg>
+            <svg class="ico-pause" width="20" height="20"><use href="#i-pause"/></svg>
+          </button>
+          <button class="icon-btn icon-btn--sm" id="btn-bar-next" aria-label="Следующий"><svg width="20" height="20"><use href="#i-next"/></svg></button>
+          <button class="icon-btn icon-btn--sm" id="btn-bar-repeat" aria-label="Повтор"><svg width="18" height="18"><use href="#i-repeat"/></svg><em class="badge-one" id="repeat-one-2">1</em></button>
+        </div>
+        <div class="bar-time">
+          <time id="bar-current" datetime="PT0S">0:00</time>
+          <time id="bar-duration" datetime="PT0S">0:00</time>
+        </div>
+      </div>
+
+      <div class="playbar__right">
+        <canvas class="mini-viz" id="bar-viz" width="220" height="34" aria-hidden="true"></canvas>
+        <div class="volume">
+          <button class="icon-btn icon-btn--sm" id="btn-mute" aria-label="Без звука"><svg width="18" height="18"><use href="#i-volume"/></svg></button>
+          <input class="range range--vol" id="volume" type="range" min="0" max="100" value="72" aria-label="Громкость">
+        </div>
+        <button class="icon-btn icon-btn--sm" id="btn-queue" aria-label="Очередь" title="Очередь"><svg width="18" height="18"><use href="#i-queue"/></svg><em class="dot-badge" id="queue-badge" hidden>0</em></button>
+        <button class="icon-btn icon-btn--sm" id="btn-settings" aria-label="Настройки" title="Настройки"><svg width="18" height="18"><use href="#i-sliders"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ OVERLAYS ============================ -->
+<div class="sheet" id="queue-sheet" hidden>
+  <div class="sheet__backdrop" data-close></div>
+  <div class="sheet__panel glass" role="dialog" aria-modal="true" aria-label="Очередь воспроизведения">
+    <div class="sheet__head">
+      <h2><svg width="18" height="18"><use href="#i-queue"/></svg> Очередь</h2>
+      <div class="sheet__head-tools">
+        <button class="ghost-btn" id="btn-queue-clear">Очистить</button>
+        <button class="icon-btn icon-btn--sm" data-close aria-label="Закрыть"><svg width="18" height="18"><use href="#i-close"/></svg></button>
+      </div>
+    </div>
+    <ul class="queue queue--sheet" id="sheet-queue-list"></ul>
+    <p class="sheet__empty" id="sheet-queue-empty">Очередь пуста</p>
+  </div>
+</div>
+
+<div class="sheet" id="settings-sheet" hidden>
+  <div class="sheet__backdrop" data-close></div>
+  <div class="sheet__panel sheet__panel--settings glass" role="dialog" aria-modal="true" aria-label="Настройки">
+    <div class="sheet__head">
+      <h2><svg width="18" height="18"><use href="#i-sliders"/></svg> Настройки звука и интерфейса</h2>
+      <button class="icon-btn icon-btn--sm" data-close aria-label="Закрыть"><svg width="18" height="18"><use href="#i-close"/></svg></button>
+    </div>
+
+    <div class="setting">
+      <div class="setting__label"><b>Кроссфейд</b><span id="val-crossfade">2.0 с</span></div>
+      <input class="range" id="set-crossfade" type="range" min="0" max="8" step="0.5" value="2" aria-label="Длительность кроссфейда">
+    </div>
+    <div class="setting">
+      <div class="setting__label"><b>Мастер-громкость</b><span id="val-volume">72%</span></div>
+      <input class="range" id="set-volume" type="range" min="0" max="100" step="1" value="72" aria-label="Мастер-громкость">
+    </div>
+    <div class="setting setting--row">
+      <div class="setting__label"><b>Акцент интерфейса</b><span>цвет подсветки и фона</span></div>
+      <div class="accents" id="accents" role="group" aria-label="Акцентный цвет">
+        <button class="accent is-active" data-accent="aurora" style="--a:#7c8cff;--b:#c07cff" aria-label="Аврора"></button>
+        <button class="accent" data-accent="ember" style="--a:#ff8a4c;--b:#ff4c8a" aria-label="Ембер"></button>
+        <button class="accent" data-accent="lagoon" style="--a:#3ad0ff;--b:#3affc0" aria-label="Лагуна"></button>
+        <button class="accent" data-accent="grape" style="--a:#b06bff;--b:#6b8cff" aria-label="Грейп"></button>
+      </div>
+    </div>
+    <div class="setting setting--row">
+      <div class="setting__label"><b>Снижение движения</b><span>убирает параллакс и анимации фона</span></div>
+      <button class="switch" id="set-motion" role="switch" aria-checked="false"><i></i></button>
+    </div>
+    <div class="setting setting--row">
+      <div class="setting__label"><b>Реактивный фон</b><span>подсветка реагирует на звук</span></div>
+      <button class="switch" id="set-reactive" role="switch" aria-checked="true"><i></i></button>
+    </div>
+    <div class="setting setting--row">
+      <div class="setting__label"><b>Сбросить прогресс</b><span>очередь, избранное, настройки</span></div>
+      <button class="ghost-btn ghost-btn--danger" id="set-reset">Сбросить</button>
+    </div>
+  </div>
+</div>
+
+<div class="palette" id="palette" hidden>
+  <div class="palette__backdrop" data-close-palette></div>
+  <div class="palette__box glass" role="dialog" aria-modal="true" aria-label="Командная палитра">
+    <div class="palette__field">
+      <svg width="18" height="18"><use href="#i-search"/></svg>
+      <input id="palette-input" placeholder="Трек, альбом или действие…" autocomplete="off" spellcheck="false" aria-label="Команда">
+      <kbd>Esc</kbd>
+    </div>
+    <ul class="palette__list" id="palette-list" role="listbox"></ul>
+    <div class="palette__foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> навигация</span>
+      <span><kbd>↵</kbd> выбрать</span>
+    </div>
+  </div>
+</div>
+
+<div class="drop" id="drop" hidden>
+  <div class="drop__box glass">
+    <svg width="30" height="30"><use href="#i-upload"/></svg>
+    <b>Отпустите, чтобы добавить</b>
+    <span>MP3 · WAV · OGG · M4A · FLAC</span>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<input type="file" id="file-input" accept="audio/*" multiple hidden>
+
+<script type="module" src="scripts/main.js"></script>
+<noscript><p style="padding:2rem;color:#fff;font:16px system-ui">Для работы плеера нужен JavaScript.</p></noscript>
+</body>
+</html>

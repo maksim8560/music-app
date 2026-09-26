@@ -1,0 +1,556 @@
+/* ==========================================================================
+   Sonora · layout — app shell, sidebar, topbar, hero, content, playbar
+   ========================================================================== */
+
+.app {
+  position: relative;
+  z-index: var(--z-app);
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  height: 100dvh;
+  gap: var(--gap-3);
+  padding: var(--gap-3);
+}
+
+/* ==========================================================================
+   Sidebar
+   ========================================================================== */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-4);
+  padding: var(--gap-4) var(--gap-3);
+  border-radius: var(--r-xl);
+  min-height: 0;
+  transition: width var(--d3) var(--ease), padding var(--d3) var(--ease);
+  overflow: hidden;
+}
+
+.sidebar__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-2);
+  padding: 2px 6px 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.brand__mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 12px;
+  color: var(--accent-ink);
+  background: var(--accent-grad);
+  box-shadow:
+    0 6px 18px -6px color-mix(in oklab, var(--accent-a) 70%, transparent),
+    inset 0 1px 0 var(--glass-spec);
+  transition: transform var(--d3) var(--ease-back);
+}
+
+.brand:hover .brand__mark { transform: translateY(-2px) rotate(-6deg); }
+
+.brand__text { display: grid; line-height: 1.15; min-width: 0; }
+.brand__text b { font-size: 1.02rem; letter-spacing: -0.03em; }
+.brand__text em {
+  font-style: normal;
+  font-size: var(--t-micro);
+  color: var(--text-3);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.sidebar__collapse svg { transform: rotate(180deg); transition: transform var(--d3) var(--ease); }
+
+.nav { display: grid; gap: 2px; }
+
+.nav__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color var(--d1) var(--ease-soft), background var(--d1) var(--ease-soft);
+}
+
+.nav__item svg { opacity: 0.75; transition: opacity var(--d1) var(--ease-soft); }
+.nav__item:hover { color: var(--text); background: var(--fill-1); }
+
+.nav__item.is-active {
+  color: var(--text);
+  background: var(--glass-2);
+  box-shadow: inset 0 1px 0 var(--glass-line-2);
+}
+
+.nav__item.is-active svg { opacity: 1; color: var(--accent-a); }
+.nav__item.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 17px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent-grad);
+  transform: translateY(-50%);
+}
+
+.nav__count {
+  margin-left: auto;
+  font-style: normal;
+  font-size: var(--t-micro);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar__section { display: grid; gap: var(--gap-2); min-height: 0; }
+
+.sidebar__label {
+  padding: 0 12px;
+  font-size: var(--t-micro);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+.side-list { display: grid; gap: 1px; overflow-y: auto; }
+
+.side-list__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 12px;
+  border-radius: var(--r-xs);
+  color: var(--text-2);
+  font-size: 0.875rem;
+  text-align: left;
+  white-space: nowrap;
+  transition: color var(--d1) var(--ease-soft), background var(--d1) var(--ease-soft);
+}
+
+.side-list__item:hover { color: var(--text); background: var(--fill-1); }
+
+.side-list__item.is-active {
+  color: var(--text);
+  background: var(--fill-2);
+  font-weight: 550;
+}
+
+.side-list__item em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: var(--t-micro);
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.side-list__dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-a) 18%, transparent);
+}
+
+.side-list__dot[data-dot="ambient"]   { background: linear-gradient(135deg, #7c8cff, #4ad4ff); }
+.side-list__dot[data-dot="lofi"]      { background: linear-gradient(135deg, #ffb46b, #ff6b9d); }
+.side-list__dot[data-dot="electronic"]{ background: linear-gradient(135deg, #5be6c0, #2fa8ff); }
+.side-list__dot[data-dot="neo"]       { background: linear-gradient(135deg, #c07cff, #7c5bff); }
+.side-list__dot[data-dot="local"]     { background: linear-gradient(135deg, #9aa4c7, #6b7396); }
+
+.sidebar__foot { margin-top: auto; display: grid; gap: var(--gap-3); padding: 0 6px 2px; }
+
+.sidebar__hint {
+  font-size: var(--t-micro);
+  color: var(--text-4);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+/* mini spectrum in the sidebar footer */
+.spectrum-mini {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 30px;
+  padding: 0 2px;
+}
+
+.spectrum-mini i {
+  flex: 1;
+  height: 12%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent-a), color-mix(in oklab, var(--accent-b) 60%, transparent));
+  opacity: 0.55;
+  transform-origin: bottom;
+  transition: height 90ms linear, opacity 90ms linear;
+}
+
+/* ==========================================================================
+   Main column
+   ========================================================================== */
+.main {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--gap-3);
+  min-width: 0;
+  min-height: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-3);
+  padding: 11px 13px;
+  border-radius: var(--r-lg);
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  margin-left: auto;
+}
+
+/* search field */
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 auto;
+  max-width: 520px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--fill-1);
+  border: 1px solid transparent;
+  box-shadow: inset 0 1px 0 var(--glass-line);
+  transition: background var(--d2) var(--ease-soft), border-color var(--d2) var(--ease-soft),
+    box-shadow var(--d2) var(--ease-soft);
+}
+
+.search:focus-within {
+  background: var(--fill-2);
+  border-color: color-mix(in oklab, var(--accent-a) 40%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent-a) 14%, transparent);
+}
+
+.search__icon { color: var(--text-3); flex: none; }
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.search input::placeholder { color: var(--text-4); }
+
+.search__kbd { flex: none; }
+
+.search__clear {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--text-3);
+  background: var(--fill-2);
+  transition: color var(--d1) var(--ease-soft), background var(--d1) var(--ease-soft);
+}
+
+.search__clear:hover { color: var(--text); background: var(--fill-3); }
+
+/* ==========================================================================
+   Scroll region
+   ========================================================================== */
+.scroll {
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 2px calc(var(--bar-h) + var(--gap-4));
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+/* ==========================================================================
+   Hero / Now playing
+   ========================================================================== */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(240px, 400px) minmax(0, 1fr);
+  gap: clamp(var(--gap-4), 3.4vw, 52px);
+  align-items: center;
+  padding: clamp(var(--gap-3), 2.2vw, 26px);
+  border-radius: var(--r-xl);
+}
+
+.hero__art-wrap { display: grid; gap: var(--gap-3); justify-items: center; }
+
+/* `minmax(0, 1fr)` keeps the copy track from being widened by the
+   min-content of a nowrap flex row (e.g. `.transport`) */
+.hero__body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-3); min-width: 0; }
+
+.hero__eyebrow { display: flex; align-items: center; gap: var(--gap-2); flex-wrap: wrap; }
+
+.hero__meta {
+  font-size: var(--t-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.hero__title {
+  font-size: var(--t-display);
+  line-height: 1.02;
+  letter-spacing: -0.042em;
+  background: linear-gradient(180deg, var(--text) 20%, color-mix(in oklab, var(--text) 55%, transparent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-wrap: balance;
+  /* generated titles can be a single very long word — never let the
+     min-content size push the headline past its column */
+  overflow-wrap: anywhere;
+}
+
+.hero__artist {
+  font-size: var(--t-title);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--accent-a);
+  overflow-wrap: anywhere;
+}
+
+.hero__note {
+  font-size: var(--t-small);
+  color: var(--text-3);
+  max-width: 46ch;
+  min-height: 1.4em;
+}
+
+/* ==========================================================================
+   Content grid: queue + library
+   ========================================================================== */
+.content {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.6fr);
+  gap: var(--gap-3);
+  align-items: start;
+  margin-top: var(--gap-3);
+}
+
+.panel {
+  border-radius: var(--r-xl);
+  padding: var(--gap-4) var(--gap-3) var(--gap-3);
+  min-width: 0;
+}
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  padding: 0 8px var(--gap-3);
+}
+
+.panel__head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t-section);
+  letter-spacing: -0.02em;
+}
+
+.panel__head h2 svg { color: var(--accent-a); }
+
+.panel__head-tools { display: flex; align-items: center; gap: var(--gap-2); margin-left: auto; }
+
+.panel__hint {
+  font-size: var(--t-micro);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.foot {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: var(--gap-4) 0 var(--gap-2);
+  font-size: var(--t-micro);
+  color: var(--text-4);
+  text-align: center;
+  flex-wrap: wrap;
+}
+
+.foot__dot { opacity: 0.5; }
+
+/* ==========================================================================
+   Bottom play bar
+   ========================================================================== */
+/* `.glass` keeps its `position: relative` in a low cascade layer, so the bar
+   and the drawer stay out of the app grid flow on their own. The extra
+   specificity here is just belt-and-braces. */
+.app > .playbar {
+  position: fixed;
+  left: calc(var(--sidebar-w) + var(--gap-3) * 2);
+  right: var(--gap-3);
+  bottom: var(--gap-3);
+  z-index: var(--z-bar);
+  border-radius: var(--r-lg);
+  padding: 0;
+  overflow: hidden;
+}
+
+.playbar__progress { position: relative; height: 3px; }
+
+/* hit area stays *inside* the bar: the progress line plus the inner top
+   padding, so `overflow: hidden` on the bar never clips the drag target.
+   `margin: 0` cancels the UA margin Chrome puts on range inputs. */
+.playbar__progress .range {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 13px;
+  margin: 0;
+  z-index: 2;
+  opacity: 0;
+  cursor: pointer;
+}
+.playbar__progress .range:focus-visible { opacity: 1; }
+
+.playbar__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--gap-3);
+  padding: 10px 14px;
+}
+
+.playbar__center { display: grid; justify-items: center; gap: 2px; }
+
+.playbar__right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gap-2);
+  min-width: 0;
+}
+
+.bar-time {
+  display: flex;
+  gap: 7px;
+  font-size: var(--t-micro);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+/* ==========================================================================
+   Rail mode (collapsed sidebar)
+   ========================================================================== */
+.app[data-rail="true"] { --sidebar-w: 78px; }
+.app[data-rail="true"] .sidebar { padding-inline: var(--gap-2); align-items: center; }
+.app[data-rail="true"] .brand__text,
+.app[data-rail="true"] .nav__item span,
+.app[data-rail="true"] .nav__count,
+.app[data-rail="true"] .sidebar__label,
+.app[data-rail="true"] .side-list__item:not(.is-active),
+.app[data-rail="true"] .sidebar__hint { display: none; }
+.app[data-rail="true"] .nav__item { justify-content: center; padding-inline: 0; width: 46px; }
+.app[data-rail="true"] .side-list { display: flex; flex-direction: column; align-items: center; }
+.app[data-rail="true"] .side-list__item.is-active { justify-content: center; }
+.app[data-rail="true"] .sidebar__collapse svg { transform: none; }
+.app[data-rail="true"] .sidebar__foot { justify-items: center; }
+.app[data-rail="true"] .spectrum-mini { width: 44px; gap: 2px; }
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+@media (max-width: 1180px) {
+  .content { grid-template-columns: minmax(0, 1fr); }
+  .playbar__right .mini-viz { display: none; }
+
+  /* two hero columns stop fitting: the display headline needs more room
+     than its longest word, so stack the art above the copy */
+  .hero {
+    grid-template-columns: minmax(0, 340px);
+    justify-items: center;
+    text-align: center;
+  }
+  .hero__art-wrap { width: 100%; }
+  /* stretch, never `justify-items: center` — centring would shrink `.seek`
+     to its fit-content width and push it past the column */
+  .hero__body { width: 100%; }
+  .hero__note { margin-inline: auto; }
+  .hero__eyebrow { justify-content: center; }
+  /* 6 controls need 356px at the default 16px gap, more than the 340px
+     column — tighten the gap so they stay on one line
+     (`.hero` prefix: `.transport` itself lives in player.css) */
+  .hero .transport { justify-content: center; gap: var(--gap-2); }
+  .chips { justify-content: center; }
+}
+
+@media (max-width: 980px) {
+  :root { --bar-h: 84px; }
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .app > .sidebar {
+    position: fixed;
+    inset: var(--gap-3) auto var(--gap-3) var(--gap-3);
+    width: 264px;
+    z-index: 50;
+    transform: translateX(calc(-100% - var(--gap-3) - 8px));
+    transition: transform var(--d3) var(--ease);
+  }
+  .app[data-drawer="true"] .sidebar { transform: none; }
+  .app > .playbar { left: var(--gap-3); }
+  .search__kbd { display: none; }
+  .app[data-rail="true"] { --sidebar-w: 0px; }
+  .app[data-rail="true"] .sidebar__collapse svg { transform: rotate(180deg); }
+}
+
+@media (max-width: 720px) {
+  /* the bar stacks the transport over the tools, so it is ~132px tall */
+  :root { --bar-h: 128px; }
+  .playbar__inner { grid-template-columns: minmax(0, 1fr) auto; gap: var(--gap-2); }
+  .playbar__center { grid-row: 1; grid-column: 2; }
+  .playbar__right { grid-row: 2; grid-column: 1 / -1; justify-content: space-between; }
+  .playbar__right .volume { flex: 1; max-width: 190px; }
+  .topbar { flex-wrap: wrap; }
+  .search { max-width: none; order: 1; width: 100%; }
+  .topbar__actions { order: 2; width: 100%; justify-content: space-between; }
+  .pill span { display: none; }
+}
+
+@media (max-width: 520px) {
+  .app { padding: var(--gap-2); gap: var(--gap-2); }
+  .app > .playbar { left: var(--gap-2); right: var(--gap-2); bottom: var(--gap-2); }
+  .app > .sidebar { inset: var(--gap-2) auto var(--gap-2) var(--gap-2); }
+  .scroll { padding-bottom: calc(var(--bar-h) + var(--gap-4)); }
+  /* below ~370px the column is narrower than the controls: let them wrap
+     instead of overflowing the panel */
+  .hero .transport { flex-wrap: wrap; }
+  .btn-like-text { display: none; }
+}

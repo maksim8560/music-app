@@ -1,0 +1,13 @@
+# Secrets: this file was committed by mistake and is public. It stays on disk
+# but must never be tracked again — the real fix is rotating the values, which
+# only the owner can do.
+.env
+.env.*
+!.env.example
+
+node_modules/
+npm-debug.log*
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
