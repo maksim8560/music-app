@@ -395,19 +395,6 @@
   white-space: nowrap;
 }
 
-.foot {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  padding: var(--gap-4) 0 var(--gap-2);
-  font-size: var(--t-micro);
-  color: var(--text-4);
-  text-align: center;
-  flex-wrap: wrap;
-}
-
-.foot__dot { opacity: 0.5; }
-
 /* ==========================================================================
    Bottom play bar
    ========================================================================== */

@@ -105,6 +105,12 @@ export class ArtRenderer {
   constructor() {
     this.masters = new Map(); // trackId -> canvas
     this.images = new Map();  // coverUrl -> HTMLImageElement
+    /* Canvases painted before their cover had arrived, so they can be redone the
+       moment it does. The big cover is drawn on the frame the track changes —
+       long before a remote image finishes — and `paint` refuses to touch a
+       canvas twice for the same track, so without this it kept the drawn-from-
+       code placeholder for the rest of the session. */
+    this.pending = new Map(); // coverUrl -> [{ canvas, track }]
   }
 
   /** Warm up cover images so they are ready before they are painted */
@@ -113,8 +119,24 @@ export class ArtRenderer {
     if (this.images.has(track.coverUrl)) return;
     const img = new Image();
     img.decoding = 'async';
-    img.src = track.coverUrl;
-    this.images.set(track.coverUrl, img);
+    const url = track.coverUrl;
+    const settle = () => this.#flushPending(url);
+    img.addEventListener('load', settle, { once: true });
+    /* a broken cover must not leave the canvas waiting forever */
+    img.addEventListener('error', settle, { once: true });
+    img.src = url;
+    this.images.set(url, img);
+  }
+
+  #flushPending(url) {
+    const waiting = this.pending.get(url);
+    if (!waiting?.length) return;
+    this.pending.delete(url);
+    for (const { canvas, track } of waiting) {
+      if (!canvas.isConnected) continue;
+      canvas.__trackId = null; // let paint() do the work again
+      this.paint(canvas, track);
+    }
   }
 
   master(track) {
@@ -228,6 +250,14 @@ export class ArtRenderer {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     } else {
       ctx.drawImage(this.master(track), 0, 0, canvas.width, canvas.height);
+      /* the cover is still on its way — leave a note so it can be drawn in
+         when it lands, instead of staying a placeholder for good */
+      if (track.coverUrl) {
+        if (!this.images.has(track.coverUrl)) this.preload(track);
+        if (!this.pending.has(track.coverUrl)) this.pending.set(track.coverUrl, []);
+        const list = this.pending.get(track.coverUrl);
+        if (!list.some((e) => e.canvas === canvas)) list.push({ canvas, track });
+      }
     }
     canvas.__trackId = track.id;
   }

@@ -284,23 +284,9 @@ function initMediaSession() {
 }
 
 /* ==========================================================================
-   Engine status readout
+   Get the audio thread warm on the very first gesture, so the first ▶ is
+   instant instead of waiting for the context to spin up.
    ========================================================================== */
-function initStatus() {
-  const foot = qs('#foot-engine');
-  const paint = () => {
-    if (!foot) return;
-    const rate = engine.ctx ? `${Math.round(engine.ctx.sampleRate / 1000)} кГц` : '48 кГц';
-    const state = engine.ctx ? engine.ctx.state : 'idle';
-    foot.textContent = `AudioContext: ${state} · ${rate}`;
-  };
-  engine.on('state', paint);
-  setInterval(paint, 1000);
-  paint();
-}
-
-/* Get the audio thread warm on the very first gesture, so the first ▶ is
-   instant instead of waiting for the context to spin up. */
 function initAudioWarmup() {
   const offPointer = on(window, 'pointerdown', warm, { capture: true });
   const offKey = on(window, 'keydown', warm, { capture: true });
@@ -369,7 +355,6 @@ function boot() {
   initNav();
   initImport();
   initMediaSession();
-  initStatus();
   initAutoplayGuard();
   initAudioWarmup();
   initAdmin();
