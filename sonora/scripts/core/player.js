@@ -1,5 +1,5 @@
 /* ==========================================================================
-   core/player.js — playback controller
+   core/player.js вЂ” playback controller
    Owns the library, the queue, crossfade timing and Media Session metadata.
    The store holds the state; the views subscribe to it.
    ========================================================================== */
@@ -106,7 +106,7 @@ class Player {
       .some((field) => field.toLowerCase().includes(q));
   }
 
-  /** Library after filter + search — what the track list shows */
+  /** Library after filter + search вЂ” what the track list shows */
   visible() {
     const { filter, search } = store.state;
     const likes = new Set(store.get('likes') || []);
@@ -125,7 +125,7 @@ class Player {
     return list;
   }
 
-  /** The admin playlists a track belongs to — shown as chips on its row. */
+  /** The admin playlists a track belongs to вЂ” shown as chips on its row. */
   playlistsOf(trackId) {
     return admin.playlistsOf(trackId);
   }
@@ -175,7 +175,7 @@ class Player {
       this.#syncMediaSession(track, start ?? 0);
       await engine.play(track, { offset: start ?? 0, fade });
       store.set({ loading: false });
-      /* the context may still be frozen by the autoplay policy — stay honest,
+      /* the context may still be frozen by the autoplay policy вЂ” stay honest,
          but never overwrite a pause that was requested while we were starting */
       if (this.#intent !== false) this.#latch(engine.state === 'playing');
     } catch (err) {
@@ -194,8 +194,8 @@ class Player {
       if (!sounding && wasPlaying && engine.currentTrack) this.#latch(true);
       toast(
         track.source === 'url'
-          ? `Не удалось загрузить ссылку — сервер может не отдавать CORS (${String(err.message || err)})`
-          : 'Не удалось декодировать файл',
+          ? `РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃСЃС‹Р»РєСѓ вЂ” СЃРµСЂРІРµСЂ РјРѕР¶РµС‚ РЅРµ РѕС‚РґР°РІР°С‚СЊ CORS (${String(err.message || err)})`
+          : 'РќРµ СѓРґР°Р»РѕСЃСЊ РґРµРєРѕРґРёСЂРѕРІР°С‚СЊ С„Р°Р№Р»',
         'error',
       );
     }
@@ -222,7 +222,7 @@ class Player {
          from a radio. Try the element anyway: a stream plays cross-origin just
          fine, and only a real file needs the bytes. */
       if (await this.#tryAsStream(track)) return;
-      throw new Error(`сервер не отдал CORS (${String(err.message || err)})`);
+      throw new Error(`СЃРµСЂРІРµСЂ РЅРµ РѕС‚РґР°Р» CORS (${String(err.message || err)})`);
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -251,14 +251,14 @@ class Player {
     if (!ok) {
       console.warn('[player] the element refused it as a stream');
       /* Served over https, an http:// stream is mixed content and the browser
-         blocks it outright. Say exactly that instead of a bare failure — it is
+         blocks it outright. Say exactly that instead of a bare failure вЂ” it is
          the one case the admin cannot fix from here. */
       if (location.protocol === 'https:' && track.url.startsWith('http://')) {
-        throw new Error('эфир отдаётся только по http, а сайт открыт по https — браузер блокирует такое смешанное содержимое');
+        throw new Error('СЌС„РёСЂ РѕС‚РґР°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ РїРѕ http, Р° СЃР°Р№С‚ РѕС‚РєСЂС‹С‚ РїРѕ https вЂ” Р±СЂР°СѓР·РµСЂ Р±Р»РѕРєРёСЂСѓРµС‚ С‚Р°РєРѕРµ СЃРјРµС€Р°РЅРЅРѕРµ СЃРѕРґРµСЂР¶РёРјРѕРµ');
       }
       return false;
     }
-    /* remember the finding: next time the transport can say "эфир" up front
+    /* remember the finding: next time the transport can say "СЌС„РёСЂ" up front
        instead of re-discovering it on every single play */
     track.source = 'stream';
     admin.setSource(track.id, 'stream');
@@ -267,7 +267,7 @@ class Player {
 
   /* Media Session handlers are commands, not toggles: the platform is allowed
      to echo an action back, and a toggle would flip the state a second time
-     (play → pause) right after the user pressed the button. */
+     (play в†’ pause) right after the user pressed the button. */
   async ensurePlaying() {
     if (store.get('playing')) return true;
     return this.toggle(true);
@@ -293,8 +293,8 @@ class Player {
     if (!store.get('currentId')) {
       const first = this.visible()[0] || this.ordered()[0];
       if (first) return this.play(first);
-      /* an empty shelf is not an error, but a dead ▶ button is confusing */
-      toast('Музыки пока нет — добавьте трек по ссылке в админ-панели', 'info', 5000);
+      /* an empty shelf is not an error, but a dead в–¶ button is confusing */
+      toast('РњСѓР·С‹РєРё РїРѕРєР° РЅРµС‚ вЂ” РґРѕР±Р°РІСЊС‚Рµ С‚СЂРµРє РїРѕ СЃСЃС‹Р»РєРµ РІ Р°РґРјРёРЅ-РїР°РЅРµР»Рё', 'info', 5000);
       return;
     }
     if (!engine.voice && !engine.isLive) {
@@ -317,7 +317,7 @@ class Player {
     this.#latch(running !== false);
   }
 
-  /** Store write only when it actually changes — the position tick is hot. */
+  /** Store write only when it actually changes вЂ” the position tick is hot. */
   #latch(value) {
     if (store.get('playing') !== value) store.set({ playing: value });
   }
@@ -370,7 +370,7 @@ class Player {
     queue.unshift(id);
     store.set({ queue });
     const t = this.byId(id);
-    toast(`«${t?.title ?? 'Трек'}» — играет следующим`, 'info');
+    toast(`В«${t?.title ?? 'РўСЂРµРє'}В» вЂ” РёРіСЂР°РµС‚ СЃР»РµРґСѓСЋС‰РёРј`, 'info');
   }
 
   enqueue(id) {
@@ -378,7 +378,7 @@ class Player {
     if (!queue.includes(id)) queue.push(id);
     store.set({ queue });
     const t = this.byId(id);
-    toast(`«${t?.title ?? 'Трек'}» добавлен в очередь`, 'ok');
+    toast(`В«${t?.title ?? 'РўСЂРµРє'}В» РґРѕР±Р°РІР»РµРЅ РІ РѕС‡РµСЂРµРґСЊ`, 'ok');
   }
 
   clearQueue() {
@@ -405,7 +405,7 @@ class Player {
     else likes.add(id);
     store.set({ likes: [...likes] });
     const track = this.byId(id);
-    if (track) toast(on ? `Убрано из избранного` : `«${track.title}» в избранном`, on ? 'info' : 'ok');
+    if (track) toast(on ? `РЈР±СЂР°РЅРѕ РёР· РёР·Р±СЂР°РЅРЅРѕРіРѕ` : `В«${track.title}В» РІ РёР·Р±СЂР°РЅРЅРѕРј`, on ? 'info' : 'ok');
     return !on;
   }
 
@@ -420,7 +420,7 @@ class Player {
     const order = ['off', 'all', 'one'];
     const next = order[(order.indexOf(store.get('repeat')) + 1) % order.length];
     store.set({ repeat: next });
-    toast({ off: 'Повтор выключен', all: 'Повтор всей очереди', one: 'Повтор одного трека' }[next], 'info');
+    toast({ off: 'РџРѕРІС‚РѕСЂ РІС‹РєР»СЋС‡РµРЅ', all: 'РџРѕРІС‚РѕСЂ РІСЃРµР№ РѕС‡РµСЂРµРґРё', one: 'РџРѕРІС‚РѕСЂ РѕРґРЅРѕРіРѕ С‚СЂРµРєР°' }[next], 'info');
     return next;
   }
 
@@ -467,7 +467,7 @@ class Player {
   async addFiles(fileList) {
     const files = Array.from(fileList).filter(isAudioFile);
     if (!files.length) {
-      toast('Поддерживаются аудиофайлы: MP3, WAV, OGG, M4A, FLAC', 'error');
+      toast('РџРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ Р°СѓРґРёРѕС„Р°Р№Р»С‹: MP3, WAV, OGG, M4A, FLAC', 'error');
       return [];
     }
     const added = [];
@@ -479,7 +479,7 @@ class Player {
     }
     if (added.length) {
       store.set({ order: [...(store.get('order') || []), ...added.map((t) => t.id)] });
-      toast(`Добавлено ${added.length} ${added.length === 1 ? 'трек' : 'трека'}`, 'ok');
+      toast(`Р”РѕР±Р°РІР»РµРЅРѕ ${added.length} ${added.length === 1 ? 'С‚СЂРµРє' : 'С‚СЂРµРєР°'}`, 'ok');
     }
     return added;
   }
@@ -603,7 +603,7 @@ class Player {
       try {
         const url = img.toDataURL('image/png');
         artwork.push({ src: url, sizes: `${img.width}x${img.height}`, type: 'image/png' });
-      } catch { /* tainted or too big — skip artwork */ }
+      } catch { /* tainted or too big вЂ” skip artwork */ }
     }
     try {
       navigator.mediaSession.metadata = new MediaMetadata({

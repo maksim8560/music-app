@@ -98,6 +98,37 @@ function splitList(s) {
 loadModule(ENTRY);
 for (const m of modules.values()) for (const d of m.deps) loadModule(d);
 
+/* ---------------------------- 2a. проверка экспортов --------------------- */
+/* `node --check` only looks at syntax, so a module could import a name that no
+   longer exists and the build would happily ship a page that dies on load with
+   "does not provide an export named ...". Every module is in the graph by now,
+   so the check is a comparison of each import against the target's exports. */
+const NAME_IMPORT_RE = /import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g;
+const missingExports = [];
+for (const file of modules.keys()) {
+  const src = readFileSync(file, 'utf8');
+  let hit;
+  NAME_IMPORT_RE.lastIndex = 0;
+  while ((hit = NAME_IMPORT_RE.exec(src))) {
+    const targetPath = resolve(dirname(file), hit[2]);
+    const target = modules.get(targetPath);
+    if (!target) continue; // bare specifier, or a file outside scripts/
+    const have = new Set(target.exports.map(([name]) => name));
+    for (const entry of splitList(hit[1])) {
+      const wanted = entry.split(/\s+as\s+/)[0].trim();
+      if (!have.has(wanted)) {
+        missingExports.push(`${modId(file)} импортирует «${wanted}», а в ${modId(targetPath)} такого экспорта нет`);
+      }
+    }
+  }
+}
+if (missingExports.length) {
+  console.error('✗ несовпадающие экспорты:');
+  for (const line of missingExports) console.error(`   ${line}`);
+  process.exit(1);
+}
+console.log('✓ экспорты совпадают');
+
 /* ----------------------------- 3. топологический порядок ----------------- */
 const order = [];
 const done = new Set();
