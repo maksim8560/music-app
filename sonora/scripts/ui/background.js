@@ -29,8 +29,8 @@ class Blob {
 
   step(dt, t) {
     this.phase += dt * this.speed;
-    this.cx = (this.cx + Math.cos(this.phase * 0.7) * this.vx * dt * 2.2 + 1) % 1;
-    this.cy = (this.cy + Math.sin(this.phase) * this.vy * dt * 2.2 + 1) % 1;
+    this.cx = (this.cx + Math.cos(this.phase * 0.7) * this.vx * dt * 1.3 + 1) % 1;
+    this.cy = (this.cy + Math.sin(this.phase) * this.vy * dt * 1.3 + 1) % 1;
   }
 }
 
@@ -114,7 +114,11 @@ export class Background {
     ];
 
     const level = this.reactive && this.getLevel ? this.getLevel() : 0;
-    this.energy = damp(this.energy, level, 6, dt);
+    /* A backdrop should breathe, not strobe. Following the low band with a fast
+       coefficient made the whole screen pump on every kick drum, which reads as
+       a flicker rather than as light. Slow enough that a beat lifts the glow
+       over a second or two and lets it sink back between phrases. */
+    this.energy = damp(this.energy, level, 1.1, dt);
 
     const { ctx, w, h } = this;
     ctx.globalCompositeOperation = 'source-over';
@@ -122,7 +126,7 @@ export class Background {
     ctx.fillRect(0, 0, w, h);
 
     ctx.globalCompositeOperation = 'screen';
-    const boost = 1 + this.energy * 0.45;
+    const boost = 1 + this.energy * 0.16;
 
     for (const b of this.blobs) {
       if (this.motion) b.step(dt, this.t);
@@ -130,11 +134,13 @@ export class Background {
       const cy = b.cy * h;
       const rad = Math.max(w, h) * b.r * boost;
       const t = this.colors[b.index % 2];
-      const hueShift = hsl((this.t * 4 + b.hue * 360) % 360, 0.75, 0.6);
-      const col = mixRgb(t, hueShift, 0.18 + this.energy * 0.22);
+      /* 1.2°/s: one pass through the wheel takes five minutes, so the tint
+         shifts under the eye instead of chasing it */
+      const hueShift = hsl((this.t * 1.2 + b.hue * 360) % 360, 0.75, 0.6);
+      const col = mixRgb(t, hueShift, 0.12 + this.energy * 0.1);
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-      g.addColorStop(0, rgba(col, 0.5 + this.energy * 0.16));
-      g.addColorStop(0.45, rgba(col, 0.16 + this.energy * 0.08));
+      g.addColorStop(0, rgba(col, 0.5 + this.energy * 0.1));
+      g.addColorStop(0.45, rgba(col, 0.16 + this.energy * 0.05));
       g.addColorStop(1, rgba(col, 0));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);

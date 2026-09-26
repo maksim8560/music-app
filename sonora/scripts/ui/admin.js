@@ -165,6 +165,15 @@ function applySite() {
     stage.style.backgroundImage = site.background ? `url("${CSS.escape ? site.background.replace(/"/g, '\\"') : site.background}")` : '';
     stage.dataset.on = site.background ? 'true' : '';
   }
+
+  /* The accent lives in two stores: here and in the player's own settings. Only
+     the form used to tie them together, so a value written anywhere else — or a
+     reload — left the page showing whatever the player remembered instead of
+     what the admin chose. The admin layer wins whenever it has an opinion. */
+  if (site.accent && store.get('settings')?.accent !== site.accent) {
+    store.patchSettings({ accent: site.accent });
+    applyTheme();
+  }
 }
 
 function buildSite() {

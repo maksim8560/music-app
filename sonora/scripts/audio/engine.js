@@ -204,8 +204,12 @@ const isStream = (track) => !!track && track.source === 'stream';
  * refuses it outright. Most radios answer on 443 as well, so try the secure
  * spelling first; if that host has no TLS the attempt fails and the caller
  * reports it in plain words rather than leaving silence.
+ *
+ * Exported because the player probes the URL before deciding anything, and a
+ * blocked probe would show up in the console as a mixed-content error even
+ * though the playback that follows is fine.
  */
-const secureUrl = (url) => (location.protocol === 'https:' && url.startsWith('http://')
+export const secureUrl = (url) => (location.protocol === 'https:' && url.startsWith('http://')
   ? `https://${url.slice(7)}`
   : url);
 

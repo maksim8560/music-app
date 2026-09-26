@@ -6,7 +6,7 @@
 
 import { store } from './store.js';
 import { addTask } from './raf.js';
-import { engine } from '../audio/engine.js';
+import { engine, secureUrl } from '../audio/engine.js';
 import { admin } from '../data/admin.js';
 import { makeLocalTrack, isAudioFile, revokeCovers } from '../audio/files.js';
 import { art } from '../ui/artwork.js';
@@ -203,7 +203,10 @@ class Player {
   async #fetchTrack(track) {
     let res;
     try {
-      res = await fetch(track.url, { mode: 'cors' });
+      /* Probe the secure spelling. On an https page an http:// request is
+         refused as mixed content, and the console would carry that error even
+         though the stream itself goes on to play fine over https. */
+      res = await fetch(secureUrl(track.url), { mode: 'cors' });
     } catch (err) {
       /* No CORS means we cannot even read the headers, so we cannot tell a file
          from a radio. Try the element anyway: a stream plays cross-origin just

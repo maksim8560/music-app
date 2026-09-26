@@ -1479,46 +1479,28 @@ kbd {
 }
 
 /* ==========================================================================
-   Live stream — a broadcast has no timeline, so the scrubber is replaced by a
-   label rather than left as a dead slider
+   Live stream — a broadcast has no timeline, so the scrubber is replaced by an
+   "on air" chip right above the title, where the eye already is
    ========================================================================== */
-.live-tag {
-  position: absolute;
-  top: 7px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: var(--t-small);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  pointer-events: none;
+.chip--onair {
+  color: #ff6b61;
+  border-color: color-mix(in oklab, #ff5f57 45%, transparent);
+  background: color-mix(in oklab, #ff5f57 14%, transparent);
+  gap: 7px;
 }
-.live-tag[hidden] { display: none; }
-.live-tag__dot {
-  width: 6px;
-  height: 6px;
+.chip--onair[hidden] { display: none; }
+.onair-dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
+  flex: none;
   background: #ff5f57;
-  box-shadow: 0 0 0 0 rgba(255, 95, 87, 0.55);
-  animation: live-pulse 2s var(--ease) infinite;
+  animation: onair-pulse 2s var(--ease) infinite;
 }
-@keyframes live-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(255, 95, 87, 0.5); }
-  70%  { box-shadow: 0 0 0 7px rgba(255, 95, 87, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 95, 87, 0); }
+@keyframes onair-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 95, 87, 0.5); }
+  60%      { opacity: 0.75; box-shadow: 0 0 0 6px rgba(255, 95, 87, 0); }
 }
-
-.seek__live {
-  margin: var(--gap-2) 0 0;
-  font-size: var(--t-small);
-  color: var(--text-3);
-  letter-spacing: 0.02em;
-}
-.seek__live[hidden] { display: none; }
 
 /* ==========================================================================
    Queue
@@ -2673,6 +2655,7 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
         <div class="hero__body">
           <div class="hero__eyebrow">
             <span class="chip chip--live" id="hero-badge"><i class="eq"><b></b><b></b><b></b></i><span>Сейчас играет</span></span>
+            <span class="chip chip--onair" id="hero-onair" hidden><i class="onair-dot"></i>Прямой эфир</span>
             <span class="hero__meta" id="hero-meta">Ambient · 2026</span>
           </div>
           <h1 class="hero__title" id="hero-title">—</h1>
@@ -2686,7 +2669,6 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
               <span class="seek__badge" id="hero-quality">Lossless 24/96</span>
               <time id="hero-duration" datetime="PT0S">0:00</time>
             </div>
-            <p class="seek__live" id="hero-live" hidden>Прямой эфир — перемотки нет</p>
           </div>
 
           <div class="transport">
@@ -2762,7 +2744,6 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
     <div class="playbar__progress">
       <input class="range range--bar" id="bar-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Позиция воспроизведения">
     </div>
-    <p class="live-tag" id="bar-live" hidden><span class="live-tag__dot"></span>Прямой эфир</p>
 
     <div class="playbar__inner">
       <div class="np">
@@ -4158,6 +4139,20 @@ class Voice {
 /** A track is a live stream when the admin said so — radio has no end. */
 const isStream = (track) => !!track && track.source === 'stream';
 
+/**
+ * An `http://` stream on an `https://` page is mixed content and the browser
+ * refuses it outright. Most radios answer on 443 as well, so try the secure
+ * spelling first; if that host has no TLS the attempt fails and the caller
+ * reports it in plain words rather than leaving silence.
+ *
+ * Exported because the player probes the URL before deciding anything, and a
+ * blocked probe would show up in the console as a mixed-content error even
+ * though the playback that follows is fine.
+ */
+const secureUrl = (url) => (location.protocol === 'https:' && url.startsWith('http://')
+  ? `https://${url.slice(7)}`
+  : url);
+
 class AudioEngine {
   constructor() {
     this.ctx = null;
@@ -4361,7 +4356,7 @@ class AudioEngine {
     el.volume = this.muted ? 0 : this.volume;
     /* No crossOrigin attribute on purpose: it would demand CORS headers the
        radio does not send, and the element would refuse to play at all. */
-    el.src = track.url;
+    el.src = secureUrl(track.url);
 
     const started = await new Promise((resolve) => {
       let settled = false;
@@ -4676,7 +4671,7 @@ class AudioEngine {
 
 const engine = new AudioEngine();
 
-return { EQ_PRESETS, engine };
+return { EQ_PRESETS, secureUrl, engine };
 });
 
 __mod("scripts/data/tracks.js", function () {
@@ -5036,7 +5031,9 @@ class Admin {
          stream has no length at all, and 0 is how the transport reads that. */
       duration: 0,
       colors: live ? ['#ff7a6b', '#ffc46b'] : ['#2f8cff', '#63f5d2'],
-      blurb: blurb?.trim() || clean,
+      /* the raw link is not a description: as a fallback it would end up under
+         the title, where a stream of text tells the reader nothing */
+      blurb: blurb?.trim() || '',
       coverUrl: cleanImage(cover),
       url: clean,
       source: live ? 'stream' : 'url',
@@ -5589,7 +5586,7 @@ __mod("scripts/core/player.js", function () {
 
 const { store: store } = __req("scripts/core/store.js");
 const { addTask: addTask } = __req("scripts/core/raf.js");
-const { engine: engine } = __req("scripts/audio/engine.js");
+const { engine: engine, secureUrl: secureUrl } = __req("scripts/audio/engine.js");
 const { admin: admin } = __req("scripts/data/admin.js");
 const { makeLocalTrack: makeLocalTrack, isAudioFile: isAudioFile, revokeCovers: revokeCovers } = __req("scripts/audio/files.js");
 const { art: art } = __req("scripts/ui/artwork.js");
@@ -5786,7 +5783,10 @@ class Player {
   async #fetchTrack(track) {
     let res;
     try {
-      res = await fetch(track.url, { mode: 'cors' });
+      /* Probe the secure spelling. On an https page an http:// request is
+         refused as mixed content, and the console would carry that error even
+         though the stream itself goes on to play fine over https. */
+      res = await fetch(secureUrl(track.url), { mode: 'cors' });
     } catch (err) {
       /* No CORS means we cannot even read the headers, so we cannot tell a file
          from a radio. Try the element anyway: a stream plays cross-origin just
@@ -5820,6 +5820,12 @@ class Player {
     const ok = await engine.playStream({ ...track, source: 'stream' });
     if (!ok) {
       console.warn('[player] the element refused it as a stream');
+      /* Served over https, an http:// stream is mixed content and the browser
+         blocks it outright. Say exactly that instead of a bare failure — it is
+         the one case the admin cannot fix from here. */
+      if (location.protocol === 'https:' && track.url.startsWith('http://')) {
+        throw new Error('эфир отдаётся только по http, а сайт открыт по https — браузер блокирует такое смешанное содержимое');
+      }
       return false;
     }
     /* remember the finding: next time the transport can say "эфир" up front
@@ -6631,9 +6637,8 @@ const dom = {
   ring: $('ring-fg'),
   heroSeek: $('hero-progress'),
   heroSeekWrap: $('hero-seek'),
-  heroLive: $('hero-live'),
+  heroOnair: $('hero-onair'),
   barSeekWrap: document.querySelector('.playbar__progress'),
-  barLive: $('bar-live'),
   heroCur: $('hero-current'),
   heroDur: $('hero-duration'),
   barSeek: $('bar-progress'),
@@ -6687,6 +6692,7 @@ function syncTrack() {
     dom.note.textContent = empty
       ? 'Откройте админ-панель (слайдеры справа сверху) и добавьте прямую ссылку на аудиофайл — с описанием и обложкой.'
       : 'Нажмите ⌘K, чтобы найти что-нибудь по вкусу.';
+    dom.note.hidden = false;
     dom.quality.textContent = '—';
     return;
   }
@@ -6695,6 +6701,8 @@ function syncTrack() {
   swapText(dom.artist, track.artist);
   dom.meta.textContent = `${track.genre} · ${track.album} · ${track.year}`;
   dom.note.textContent = track.blurb || '';
+  /* no description — leave no empty paragraph behind the title */
+  dom.note.hidden = !track.blurb;
 
   const genreLabel = GENRES[track.genreKey]?.label ?? track.genre;
   dom.badge.querySelector('span').textContent = store.get('playing') ? 'Сейчас играет' : genreLabel;
@@ -6788,14 +6796,14 @@ function updateClock() {
 
   if (lastLive !== live) {
     lastLive = live;
-    /* the whole scrubber goes, wrappers included, and a line of text takes its
-       place — an empty gap would look like something failed to load */
+    /* the whole scrubber goes, wrappers included — an empty gap would look
+       like something failed to load, so the "on air" chip takes its place
+       right above the title, where the eye already is */
     dom.heroSeek.hidden = live;
     dom.barSeek.hidden = live;
     dom.heroSeekWrap?.toggleAttribute('hidden', live);
     dom.barSeekWrap?.toggleAttribute('hidden', live);
-    dom.heroLive?.toggleAttribute('hidden', !live);
-    dom.barLive?.toggleAttribute('hidden', !live);
+    dom.heroOnair?.toggleAttribute('hidden', !live);
     /* a live edge has no meaningful elapsed time either — a clock frozen near
        0:00 next to a running track is just noise */
     dom.barCur?.toggleAttribute('hidden', live);
@@ -7261,8 +7269,8 @@ class Blob {
 
   step(dt, t) {
     this.phase += dt * this.speed;
-    this.cx = (this.cx + Math.cos(this.phase * 0.7) * this.vx * dt * 2.2 + 1) % 1;
-    this.cy = (this.cy + Math.sin(this.phase) * this.vy * dt * 2.2 + 1) % 1;
+    this.cx = (this.cx + Math.cos(this.phase * 0.7) * this.vx * dt * 1.3 + 1) % 1;
+    this.cy = (this.cy + Math.sin(this.phase) * this.vy * dt * 1.3 + 1) % 1;
   }
 }
 
@@ -7346,7 +7354,11 @@ class Background {
     ];
 
     const level = this.reactive && this.getLevel ? this.getLevel() : 0;
-    this.energy = damp(this.energy, level, 6, dt);
+    /* A backdrop should breathe, not strobe. Following the low band with a fast
+       coefficient made the whole screen pump on every kick drum, which reads as
+       a flicker rather than as light. Slow enough that a beat lifts the glow
+       over a second or two and lets it sink back between phrases. */
+    this.energy = damp(this.energy, level, 1.1, dt);
 
     const { ctx, w, h } = this;
     ctx.globalCompositeOperation = 'source-over';
@@ -7354,7 +7366,7 @@ class Background {
     ctx.fillRect(0, 0, w, h);
 
     ctx.globalCompositeOperation = 'screen';
-    const boost = 1 + this.energy * 0.45;
+    const boost = 1 + this.energy * 0.16;
 
     for (const b of this.blobs) {
       if (this.motion) b.step(dt, this.t);
@@ -7362,11 +7374,13 @@ class Background {
       const cy = b.cy * h;
       const rad = Math.max(w, h) * b.r * boost;
       const t = this.colors[b.index % 2];
-      const hueShift = hsl((this.t * 4 + b.hue * 360) % 360, 0.75, 0.6);
-      const col = mixRgb(t, hueShift, 0.18 + this.energy * 0.22);
+      /* 1.2°/s: one pass through the wheel takes five minutes, so the tint
+         shifts under the eye instead of chasing it */
+      const hueShift = hsl((this.t * 1.2 + b.hue * 360) % 360, 0.75, 0.6);
+      const col = mixRgb(t, hueShift, 0.12 + this.energy * 0.1);
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-      g.addColorStop(0, rgba(col, 0.5 + this.energy * 0.16));
-      g.addColorStop(0.45, rgba(col, 0.16 + this.energy * 0.08));
+      g.addColorStop(0, rgba(col, 0.5 + this.energy * 0.1));
+      g.addColorStop(0.45, rgba(col, 0.16 + this.energy * 0.05));
       g.addColorStop(1, rgba(col, 0));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
@@ -7688,6 +7702,15 @@ function applySite() {
   if (stage) {
     stage.style.backgroundImage = site.background ? `url("${CSS.escape ? site.background.replace(/"/g, '\\"') : site.background}")` : '';
     stage.dataset.on = site.background ? 'true' : '';
+  }
+
+  /* The accent lives in two stores: here and in the player's own settings. Only
+     the form used to tie them together, so a value written anywhere else — or a
+     reload — left the page showing whatever the player remembered instead of
+     what the admin chose. The admin layer wins whenever it has an opinion. */
+  if (site.accent && store.get('settings')?.accent !== site.accent) {
+    store.patchSettings({ accent: site.accent });
+    applyTheme();
   }
 }
 
@@ -8359,6 +8382,17 @@ class Bars {
     ctx.clearRect(0, 0, W, H);
     if (!W || !H) return;
 
+    /* Music is playing but there is no spectrum to read — a live radio stream
+       bypasses the graph entirely, so the analyser sees nothing. Drawing the
+       usual floor of stub bars would look like a real signal sitting at a
+       constant low level, so show nothing instead. An idle player keeps its
+       faint baseline; only "playing with no data" goes blank. */
+    if (active && !spectrum) {
+      this.values.fill(0);
+      this.peaks?.fill(0);
+      return;
+    }
+
     const bins = spectrum ? spectrum.length : 0;
     const n = this.bars;
     const gap = Math.max(1, (W / n) * 0.28);
@@ -8442,7 +8476,18 @@ class SideStrip {
 
   draw(spectrum, dt, active) {
     const n = this.nodes.length;
-    if (!spectrum || !n) return;
+    if (!n) return;
+    if (!spectrum) {
+      /* Let the strip fall back to its idle height rather than freezing on
+         whatever the last track drew — a live stream leaves no spectrum at
+         all, and a frozen bar would be a leftover lie. */
+      for (const el of this.nodes) {
+        el.style.height = '8%';
+        el.style.opacity = '0.35';
+      }
+      this.values?.fill(0);
+      return;
+    }
     this.acc = (this.acc || 0) + dt;
     if (this.acc < 1 / 20) return; // DOM writes — 20fps is plenty
     const step = Math.min(this.acc, 0.2);
