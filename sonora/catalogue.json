@@ -35,10 +35,12 @@
       "id": "pl-1",
       "name": "Музыка для души",
       "icon": "note",
-      "trackIds": []
+      "trackIds": [
+        "radio-1"
+      ]
     }
   ],
   "genres": [],
-  "updatedAt": 1790460615275,
-  "exportedAt": "2026-09-26T22:10:16.477Z"
+  "updatedAt": 1790460628667,
+  "exportedAt": "2026-09-26T22:10:29.880Z"
 }
