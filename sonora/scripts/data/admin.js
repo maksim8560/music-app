@@ -216,6 +216,16 @@ class Admin {
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
   }
 
+  /**
+   * The token already proved who this is, and a token owner has no need of a
+   * second password. Called after a token check so the panel can be opened
+   * without one, and so "первый в браузере" stops being a thing.
+   */
+  markAuthed() {
+    this.#authed = true;
+    this.#markSession();
+  }
+
   #markSession() {
     try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* ignore */ }
   }

@@ -451,6 +451,10 @@
   border-color: color-mix(in oklab, #ffc46b 35%, transparent);
   background: color-mix(in oklab, #ffc46b 8%, transparent);
 }
+.adm-warn--soft {
+  border-color: color-mix(in oklab, #ffc46b 22%, transparent);
+  background: color-mix(in oklab, #ffc46b 5%, transparent);
+}
 .adm-warn h3 { color: #ffc46b; }
 .adm-warn p {
   margin: 0 0 var(--gap-2);

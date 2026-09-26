@@ -105,53 +105,73 @@ function setBadge(state) {
 
 /* -------------------------------- login --------------------------------- */
 
+/**
+ * The gate is the token, not the password.
+ *
+ * A password that lives in localStorage is no gate at all: every visitor to a
+ * public site found themselves being asked to create one, and creating one
+ * opened the panel. The token is the only thing here that is actually a key -
+ * it is what lets the browser write to the repository - so the panel asks for
+ * it, and the password becomes a second lock on your own devices rather than
+ * the thing standing between a stranger and the settings.
+ */
 function buildGate() {
-  const inputPw = el('input', { type: 'password', id: 'adm-pass', autocomplete: 'current-password', placeholder: '••••••' });
-  const confirm = el('input', { type: 'password', id: 'adm-pass2', autocomplete: 'new-password', placeholder: '••••••' });
+  const cfg = remoteConfig();
   const error = el('p', { class: 'adm-error', role: 'alert' });
+
+  const tokenField = field('Токен GitHub', el('input', {
+    type: 'password', id: 'adm-token', autocomplete: 'off', placeholder: 'github_pat_…',
+  }), 'Тонкий токен: доступ только к этому репозиторию и только на чтение и запись содержимого.');
+
+  const pwField = field('Пароль панели', el('input', {
+    type: 'password', id: 'adm-pass', autocomplete: 'current-password', placeholder: '••••••',
+  }), admin.hasPassword ? 'Ваш пароль от панели на этом устройстве.' : 'Можно пропустить — это дополнительный замок, а не главный.');
 
   const submit = async (e) => {
     e?.preventDefault();
     error.textContent = '';
-    const value = inputPw.value;
-    if (!value) {
-      error.textContent = 'Введите пароль';
-      inputPw.focus();
+    const token = tokenField.querySelector('input').value.trim();
+    const password = pwField.querySelector('input').value;
+    if (!token) {
+      error.textContent = 'Нужен токен: без него панель не может записывать каталог.';
       return;
     }
     try {
-      const first = !admin.hasPassword;
-      if (first) {
-        if (value.length < 4) throw new Error('Пароль от 4 символов');
-        if (value !== confirm.value) throw new Error('Пароли не совпадают');
-        await admin.setup(value);
+      saveRemoteConfig({ token });
+      const ok = await testSync();
+      if (!ok) throw new Error(status().message || 'Токен не подошёл');
+      if (admin.hasPassword) {
+        if (!password) {
+          error.textContent = 'Введите пароль панели';
+          return;
+        }
+        if (!(await admin.login(password))) throw new Error('Неверный пароль');
+      } else if (password) {
+        await admin.setup(password);
         toast('Пароль задан', 'ok');
       } else {
-        const good = await admin.login(value);
-        if (!good) throw new Error('Неверный пароль');
+        /* a valid token is proof enough; no password to invent */
+        admin.markAuthed();
       }
       showPanel();
+      /* Nothing that was already in this browser should be stranded there now
+         that writing works: push what is on screen straight into the file. */
+      await syncNow();
     } catch (err) {
       error.textContent = String(err.message || err);
-      inputPw.select();
     }
   };
 
-  const form = el('form', { class: 'adm-gate', onsubmit: submit }, [
-    el('p', { class: 'adm-gate__lead', text: admin.hasPassword
-      ? 'Введите пароль, чтобы открыть настройки сайта и музыки.'
-      : 'Первый вход — задайте пароль. Он хранится только в этом браузере.' }),
-    field('Пароль', inputPw),
-    admin.hasPassword ? null : field('Ещё раз', confirm),
+  return el('form', { class: 'adm-gate', onsubmit: submit }, [
+    el('p', { class: 'adm-gate__lead', text: 'Панель открывается токеном GitHub. Он и есть главный замок: без него каталог не изменить.' }),
+    el('div', { class: 'adm-stack' }, [tokenField, pwField]),
     error,
     el('div', { class: 'adm-gate__row' }, [
-      el('button', { class: 'primary-btn', type: 'submit', text: admin.hasPassword ? 'Войти' : 'Задать пароль и войти' }),
+      el('button', { class: 'primary-btn', type: 'submit', text: 'Войти' }),
       button('Отмена', () => close(), 'ghost-btn'),
     ]),
-    el('p', { class: 'adm-note', text: 'Пароль защищает панель от случайного открытия, а не от того, у кого есть доступ к файлам. Каталог виден всем, кто читает репозиторий, поэтому ставьте длинную фразу.' }),
+    el('p', { class: 'adm-note', text: 'Токен хранится в этом браузере и не попадает в файл. Пароль хранится здесь же, отдельно от токена.' }),
   ]);
-
-  return form;
 }
 
 /* --------------------------------- site --------------------------------- */
@@ -658,9 +678,12 @@ function buildSync() {
       loading: s.message,
       saving: s.message,
       saved: s.message,
+      diverged: s.message,
       error: s.message,
     };
     statusLine.textContent = map[s.state] || '';
+    const warn = qs('#adm-diverged');
+    if (warn) warn.hidden = s.state !== 'diverged';
   };
   const off = onSyncChange(paint);
 
@@ -684,10 +707,12 @@ function buildSync() {
           error.textContent = '';
           saveRemoteConfig({ ...draft });
           const ok = await testSync();
-          if (ok) {
-            renderSync();
-            catalogueChanged(remoteWritable() ? 'Запись включена' : 'Проверено: каталог читается');
-          }
+          if (!ok) return;
+          renderSync();
+          /* Writing only works from here on, so anything already in this
+             browser should go into the file now rather than being stranded. */
+          if (remoteWritable()) await syncNow();
+          toast(remoteWritable() ? 'Запись включена, каталог отправлен в файл' : 'Проверено: каталог читается', 'ok', 4000);
         } }),
         el('button', { class: 'ghost-btn', type: 'button', text: 'Сохранить сейчас', onclick: async () => {
           saveRemoteConfig({ ...draft });
@@ -699,6 +724,20 @@ function buildSync() {
         } }),
       ]),
       statusLine,
+      /* The one state that must never be silent: tracks here that nobody else
+         can see, because the file does not have them yet. */
+      el('div', { class: 'adm-warn adm-warn--soft', id: 'adm-diverged', hidden: true }, [
+        el('h3', { text: 'Треки есть только в этом браузере' }),
+        el('p', { text: 'Файл каталога беднее того, что здесь. На других устройствах их не видно, пока они не записаны в файл. Такое бывает, если каталог правили до того, как был задан токен.' }),
+        el('p', { text: 'Ничего не перезаписывается без вашего участия: пустой файл не стирает то, что уже есть здесь.' }),
+        el('div', { class: 'adm-add__row' }, [
+          el('button', { class: 'primary-btn', type: 'button', text: 'Записать эти треки в файл', onclick: async () => {
+            saveRemoteConfig({ ...draft });
+            const ok = await syncNow();
+            if (ok) { renderSync(); toast('Записано — теперь видно на всех устройствах', 'ok', 4000); }
+          } }),
+        ]),
+      ]),
       el('details', { class: 'adm-details' }, [
         el('summary', { text: 'Как получить токен' }),
         el('ol', {}, [
