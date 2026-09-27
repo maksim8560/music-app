@@ -35,78 +35,26 @@ export function applyTheme() {
   btn.title = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
 }
 
-/** the palette a wash should carry for a given theme */
-const WASH = {
-  light: { in: '#ffffff', mid: '#eef0f8', out: 'rgba(255,255,255,0)', ripple: 'rgba(255,255,255,0.55)' },
-  dark: { in: '#0a0a12', mid: '#10101c', out: 'rgba(10,10,18,0)', ripple: 'rgba(190,196,255,0.42)' },
-};
-
-let washTimer = 0;
-let washClear = 0;
-
 /**
- * The wave the page changes colour in.
+ * Switch the theme.
  *
- * It always opens in the middle of the viewport. A wave that started at the
- * button was a decoration attached to a control: it drew a spotlight where the
- * finger was while the actual change still happened everywhere at once, and on
- * a wide screen the front never even reached the far side before it faded.
- * Starting from the middle means the front travels the same distance in every
- * direction, so the whole page is crossed.
+ * There is no animation here on purpose, and the colours still do not jump.
+ * The change is instant at the level of the attribute, but the nineteen colour
+ * tokens in tokens.css are registered with `@property`, so their new values
+ * arrive through the transition declared on :root - the page eases from one
+ * theme to the other, every piece of text, border and glass surface following
+ * the tokens it is built from, with nothing extra drawn over the top.
  *
- * The real theme is swapped partway through, while the front is still out over
- * the content, and the registered colour tokens keep easing afterwards - that
- * is what carries the change out to the edges and settles it, rather than the
- * page landing on the new theme in one step.
+ * What was removed is the wave. It was a disc of colour painted over the page
+ * for the length of the animation, which bought no smoothness the tokens were
+ * not already providing on their own, and cost a full-screen overlay on every
+ * change. Under prefers-reduced-motion that is the whole difference between the
+ * two: the transition is off and the change is simply immediate.
  */
-function runThemeWash(next) {
-  const wash = document.getElementById('theme-wash');
-  if (!wash) return false;
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
-
-  const palette = WASH[next] || WASH.dark;
-  const x = Math.round(window.innerWidth / 2);
-  const y = Math.round(window.innerHeight / 2);
-  wash.style.setProperty('--wash-x', `${x}px`);
-  wash.style.setProperty('--wash-y', `${y}px`);
-  wash.style.setProperty('--wash-in', palette.in);
-  wash.style.setProperty('--wash-mid', palette.mid);
-  wash.style.setProperty('--wash-out', palette.out);
-  wash.style.setProperty('--wash-ripple', palette.ripple);
-
-  clearTimeout(washTimer);
-  clearTimeout(washClear);
-  /* restart the animation even if it was mid-flight */
-  wash.removeAttribute('data-run');
-  wash.style.opacity = '';
-  void wash.offsetWidth;
-  wash.setAttribute('data-run', '');
-
-  /* the front is about a third of the way across the page at this point */
-  washTimer = setTimeout(() => {
-    store.patchSettings({ theme: next });
-    applyTheme();
-    washClear = setTimeout(() => {
-      wash.removeAttribute('data-run');
-      /* The animation is what ends the wash, so if it never runs - a hidden tab
-         where the compositor has stopped advancing frames, a browser that
-         dropped the keyframes - the overlay would sit on the page at nearly full
-         opacity. Clearing it here as well means the worst case is a brief
-         missing transition rather than an unusable page. */
-      wash.style.opacity = '0';
-    }, 1250);
-  }, 420);
-  return true;
-}
-
 export function toggleTheme() {
   const next = store.get('settings').theme === 'dark' ? 'light' : 'dark';
-  /* no wash available, or motion is unwelcome - fall back to the plain switch
-     rather than swallowing the click */
-  if (!runThemeWash(next)) {
-    store.patchSettings({ theme: next });
-    applyTheme();
-  }
+  store.patchSettings({ theme: next });
+  applyTheme();
 }
 
 /* -------------------------------- init ---------------------------------- */
@@ -179,8 +127,6 @@ export function initSettings(hooks = {}) {
     setTimeout(() => location.reload(), 400);
   });
 
-  /* the wave opens from the middle of the page, not from the button, so the
-     click position is not passed on */
   document.getElementById('btn-theme').addEventListener('click', toggleTheme);
   document.getElementById('btn-queue').addEventListener('click', () => {
     if (queueSheet.hidden) openQueueSheet();

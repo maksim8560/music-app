@@ -36,8 +36,9 @@
 @property --grain-opacity { syntax: '<number>'; inherits: true; initial-value: 0.42; }
 
 /* Long enough to be a change rather than a flicker, and eased the way the rest
-   of the interface moves. The theme wash runs underneath this at the same
-   time, so the colour arrives as a wave and the page settles into it. */
+   of the interface moves. This is the whole of the theme change: the attribute
+   flips, these nineteen values cross-fade, and every colour, border and glass
+   tint built from them follows. Nothing is drawn over the page to cover it. */
 :root {
   transition:
     --bg var(--d4) var(--ease),
@@ -119,9 +120,6 @@
   --z-sheet: 60;
   --z-palette: 80;
   --z-toast: 90;
-  /* the theme wash covers the page, so it sits above the sheets and the
-     palette; nothing takes a click from it, so it never traps anything */
-  --z-wash: 95;
 }
 
 /* ------------------------------- dark ---------------------------------- */
