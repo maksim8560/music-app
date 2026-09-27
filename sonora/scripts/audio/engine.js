@@ -777,6 +777,30 @@ class AudioEngine {
     return sum / n / 255;
   }
 
+  /**
+   * Energy in the presence band, 0..1 — roughly 2 kHz to 8 kHz.
+   *
+   * The low band alone is a poor thing to animate a backdrop with: on almost
+   * any track it sits at a steady loudness and never really moves, so the glow
+   * holds one value and the screen looks static. Cymbals, air and the upper
+   * harmonics do move, and they move with the arrangement rather than with the
+   * mastering, which is what makes a backdrop look like it is listening.
+   *
+   * Picked by frequency rather than by a fraction of the bins: the top fifth
+   * of a 2048-point FFT at 48 kHz is 19-24 kHz, which is past the top of
+   * almost every radio stream's low-pass filter and therefore always silent.
+   */
+  air() {
+    const data = this.spectrum();
+    if (!data || !this.ctx) return 0;
+    const hzPerBin = (this.ctx.sampleRate / 2) / data.length;
+    const from = Math.min(data.length - 1, Math.max(0, Math.round(2000 / hzPerBin)));
+    const to = Math.min(data.length, Math.max(from + 1, Math.round(8000 / hzPerBin)));
+    let sum = 0;
+    for (let i = from; i < to; i++) sum += data[i];
+    return sum / (to - from) / 255;
+  }
+
   async decode(arrayBuffer) {
     await this.ensure();
     return this.ctx.decodeAudioData(arrayBuffer);

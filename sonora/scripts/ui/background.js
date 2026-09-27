@@ -44,6 +44,16 @@ export class Background {
     this.base = hexToRgb(cssVar('--bg') || '#06060a');
     this.baseTarget = [...this.base];
     this.energy = 0;
+    /* A backdrop should react to the *shape* of the music, not to how loud the
+       record happens to be. An absolute level is useless for this: a mastered
+       -loud track pins the low band at a constant 0.8, so the glow holds one
+       value and the screen reads as static even though the music is moving.
+       `floor` is a slow running average of that band, and the reaction is what
+       stands above it — which is the beat, and which works the same on a quiet
+       acoustic take and a loud club record. */
+    this.floor = 0;
+    this.air = 0;
+    this.swell = 0;
     this.reactive = true;
     this.motion = true;
     this.t = 0;
@@ -80,8 +90,9 @@ export class Background {
     this.paletteDirty = true;
   }
 
-  start(getLevel) {
+  start(getLevel, getAir) {
     this.getLevel = getLevel;
+    this.getAir = getAir || null;
     addTask((dt) => this.#frame(dt));
   }
 
@@ -101,24 +112,38 @@ export class Background {
     dt = step;
     this.t += dt;
 
-    /* smooth colour transitions */
+    /* Smooth colour transitions. Slower than the pulse on purpose: a track
+       change should arrive as a shift in the light over several seconds, not as
+       a step the eye catches. */
     for (let i = 0; i < 2; i++) {
-      this.colors[i][0] = damp(this.colors[i][0], this.target[i][0], 1.1, dt);
-      this.colors[i][1] = damp(this.colors[i][1], this.target[i][1], 1.1, dt);
-      this.colors[i][2] = damp(this.colors[i][2], this.target[i][2], 1.1, dt);
+      this.colors[i][0] = damp(this.colors[i][0], this.target[i][0], 0.45, dt);
+      this.colors[i][1] = damp(this.colors[i][1], this.target[i][1], 0.45, dt);
+      this.colors[i][2] = damp(this.colors[i][2], this.target[i][2], 0.45, dt);
     }
     this.base = [
-      damp(this.base[0], this.baseTarget[0], 1.1, dt),
-      damp(this.base[1], this.baseTarget[1], 1.1, dt),
-      damp(this.base[2], this.baseTarget[2], 1.1, dt),
+      damp(this.base[0], this.baseTarget[0], 0.45, dt),
+      damp(this.base[1], this.baseTarget[1], 0.45, dt),
+      damp(this.base[2], this.baseTarget[2], 0.45, dt),
     ];
 
     const level = this.reactive && this.getLevel ? this.getLevel() : 0;
-    /* A backdrop should breathe, not strobe. Following the low band with a fast
-       coefficient made the whole screen pump on every kick drum, which reads as
-       a flicker rather than as light. Slow enough that a beat lifts the glow
-       over a second or two and lets it sink back between phrases. */
-    this.energy = damp(this.energy, level, 1.1, dt);
+    const air = this.reactive && this.getAir ? this.getAir() : 0;
+
+    /* Two different rates on purpose. The floor follows the band's own average
+       slowly, so it is the record's loudness and not its movement; the pulse is
+       what sits above it. Rises fast enough to catch a beat, falls slower, so
+       the light lifts and then settles instead of flickering. */
+    this.floor = damp(this.floor, level, 0.25, dt);
+    this.air = damp(this.air, air, 1.6, dt);
+
+    const pulse = clamp01((level - this.floor) * 3.4) * 0.62 + this.air * 0.38;
+    /* Back to rest when nothing is playing, so the site settles instead of
+       holding the last glow forever. */
+    const wanted = this.reactive ? pulse : 0;
+    this.energy = damp(this.energy, wanted, 1.4, dt);
+    /* a slow, wide swell for the big colour movement — separate from the pulse
+       so the backdrop drifts over a phrase rather than pulsing with each beat */
+    this.swell = damp(this.swell, wanted, 0.32, dt);
 
     const { ctx, w, h } = this;
     ctx.globalCompositeOperation = 'source-over';
@@ -126,7 +151,9 @@ export class Background {
     ctx.fillRect(0, 0, w, h);
 
     ctx.globalCompositeOperation = 'screen';
-    const boost = 1 + this.energy * 0.16;
+    /* the pulse moves the blobs' size, the swell their colour: two rates, so
+       the backdrop never looks like one thing being turned up and down */
+    const boost = 1 + this.energy * 0.3;
 
     for (const b of this.blobs) {
       if (this.motion) b.step(dt, this.t);
@@ -137,10 +164,10 @@ export class Background {
       /* 1.2°/s: one pass through the wheel takes five minutes, so the tint
          shifts under the eye instead of chasing it */
       const hueShift = hsl((this.t * 1.2 + b.hue * 360) % 360, 0.75, 0.6);
-      const col = mixRgb(t, hueShift, 0.12 + this.energy * 0.1);
+      const col = mixRgb(t, hueShift, 0.12 + this.swell * 0.26);
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-      g.addColorStop(0, rgba(col, 0.5 + this.energy * 0.1));
-      g.addColorStop(0.45, rgba(col, 0.16 + this.energy * 0.05));
+      g.addColorStop(0, rgba(col, 0.42 + this.energy * 0.24));
+      g.addColorStop(0.45, rgba(col, 0.14 + this.swell * 0.12));
       g.addColorStop(1, rgba(col, 0));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
@@ -152,5 +179,6 @@ export class Background {
 }
 
 const rgbCss = ([r, g, b]) => `rgb(${r | 0},${g | 0},${b | 0})`;
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 export const background = new Background(document.getElementById('bg-canvas'));

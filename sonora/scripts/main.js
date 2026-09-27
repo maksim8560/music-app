@@ -349,7 +349,10 @@ function boot() {
 
   background.resize();
   on(window, 'resize', () => background.resize());
-  background.start(() => (store.get('playing') ? engine.level() : 0));
+  background.start(
+    () => (store.get('playing') ? engine.level() : 0),
+    () => (store.get('playing') ? engine.air() : 0),
+  );
 
   initTransport();
   initSettings({ onQueueOpen: () => renderQueue() });
@@ -426,5 +429,7 @@ if (document.readyState === 'loading') {
   boot();
 }
 
-/* handy for debugging in the console */
-window.sonora = { store, player, engine, plural, admin };
+/* handy for debugging in the console — `background.energy` and
+   `background.floor` are the two numbers worth watching when the backdrop
+   "does not react" */
+window.sonora = { store, player, engine, plural, admin, background };
