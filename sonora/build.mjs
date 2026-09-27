@@ -33,6 +33,59 @@ for (const f of jsFiles) {
 }
 console.log(`✓ синтаксис в порядке: ${jsFiles.length} модулей`);
 
+/* ---------------------- 1a. проверка кодировки исходников ----------------- */
+/* Text in this project is Russian, and at some point it was written back out
+   through the wrong codepage: the bytes were correct UTF-8, but read as CP1251
+   on the way through a shell, so every affected line shipped as letter pairs
+   that mean nothing. Nothing above notices - the file is still valid UTF-8, it
+   still parses, and the only symptom is a toast that reads as noise to the one
+   person it is written for.
+
+   The damage turns the first letter of nearly every syllable into a capital,
+   so a damaged line has an absurd density of them, where ordinary Russian keeps
+   capitals to a sentence start or an acronym. Lines too short to judge are
+   skipped, because three letters cannot tell a language from a mistake. The
+   unambiguous leftovers - a capital in front of a guillemet, the two bytes of a
+   mangled em-dash - count on their own.
+
+   No example of the damage is written out in this comment on purpose: a literal
+   sample would trip the very check that contains it. */
+const textFiles = [
+  ...jsFiles,
+  ...['index.html', 'build.mjs'],
+  ...readdirSync(p('styles')).filter((f) => f.endsWith('.css')).map((f) => p('styles', f)),
+];
+
+/* A capital in front of a guillemet, or the two bytes of a mangled em-dash, are
+   unambiguous. Everything else is judged by shape: this damage turns the first
+   letter of nearly every syllable into a capital, so the line ends up with an
+   absurd density of them. Ordinary Russian capitals are sparse - a sentence
+   start, an acronym - and a short line is not judged at all, because three
+   letters in a row cannot tell a language from a mistake. */
+const STRONG = /[А-ЯЁ][«»»]|[А-Я]Ђ/u;
+const damaged = (line) => {
+  if (STRONG.test(line)) return true;
+  const letters = line.match(/[А-Яа-яЁё]/g);
+  if (!letters || letters.length < 12) return false;
+  const caps = line.match(/[А-ЯЁ]/g);
+  return Boolean(caps) && caps.length / letters.length >= 0.22;
+};
+
+const mojibake = [];
+for (const f of textFiles) {
+  const src = readFileSync(f, 'utf8');
+  src.split('\n').forEach((line, i) => {
+    if (damaged(line)) mojibake.push(`${relative(ROOT, f).replace(/\\/g, '/')}:${i + 1}`);
+  });
+}
+if (mojibake.length) {
+  console.error('✗ текст прочитан не в той кодировке (UTF-8, прочитанный как CP1251):');
+  for (const where of mojibake.slice(0, 20)) console.error(`   ${where}`);
+  if (mojibake.length > 20) console.error(`   …и ещё ${mojibake.length - 20}`);
+  process.exit(1);
+}
+console.log(`✓ кодировка в порядке: ${textFiles.length} файлов`);
+
 /* ----------------------------- 2. граф модулей --------------------------- */
 const IMPORT_RE = /^[ \t]*import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"];?[ \t]*$/gm;
 const IMPORT_NS_RE = /^[ \t]*import\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s+from\s*['"]([^'"]+)['"];?[ \t]*$/gm;

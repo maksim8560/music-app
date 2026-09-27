@@ -54,15 +54,23 @@ export class Background {
     this.floor = 0;
     this.air = 0;
     this.swell = 0;
-    /* Beats are a different animal again: a drum is a transient, not a level.
-       There was a detector here that found each onset and kicked the backdrop
-       on it, and it was wrong. Brightness pulsing on every hit is a strobe:
-       at eight hits in five seconds the whole screen throbbed, which reads as
-       an epileptic'srave rather than as light, and flashing that hard is a
-       genuine photosensitivity trigger rather than a matter of taste. So there
-       is no per-hit term any more - the reaction is the slow pulse and the
-       slower swell, and a beat reaches the eye as a breath, not as a flash. */
+    /* A beat is a transient, not a level, and a backdrop that ignores it looks
+       dead next to one that answers it. The shape matters far more than the
+       amount: this is a swell, not a flash. It opens over roughly 70ms and
+       closes over roughly 180ms, which reads as the light breathing with the
+       drums.
+
+       The first attempt set it to full the instant an onset appeared and let it
+       flicker away. At a few hits a second that is a strobe, and a strobe is a
+       genuine problem for anyone sensitive to flashing light rather than a
+       matter of taste — it was reported as "feels like a rave for an epileptic",
+       which is exactly what it was. So: an attack that is quick but never
+       instantaneous, a release slower than the attack, and a ceiling on how far
+       the screen is allowed to move. */
+    this.fast = 0;
     this.slow = 0;
+    this.beat = 0;
+    this.lastBeat = -1;
     /* 1 while nothing is playing: the backdrop goes grey and settles. */
     this.quiet = 1;
     this.reactive = true;
@@ -163,11 +171,21 @@ export class Background {
     this.slow = damp(this.slow, level, 1.1, dt);
     this.air = damp(this.air, air, 1.0, dt);
 
+    /* The beat itself. A quick follower chases the band, a slow one trails it,
+       and the distance between them is the transient — a kick or a snare is
+       exactly that: a spike the running average never sees. A short refractory
+       window keeps one hit from being counted three times. */
+    this.fast = damp(this.fast, level, 16, dt);
+    if (playing && !still && this.fast - this.slow > 0.022 && this.t - this.lastBeat > 0.14) {
+      this.lastBeat = this.t;
+      this.beat = 1;
+    }
+    /* the swell: quick to open, slower to close, and never a step */
+    this.beat = this.beat > 0 ? damp(this.beat, 0, 5.5, dt) : damp(this.beat, 0, 18, dt);
+    this.beat = Math.min(this.beat, 0.92);
+
     const pulse = clamp01((level - this.floor) * 3.2) * 0.55 + this.air * 0.45;
     const wanted = this.reactive ? pulse : 0;
-    /* Slow enough that nothing on the page ever snaps. A backdrop that answers
-       a beat within a frame is a light show; this one takes a second or two to
-       open and the same again to close. */
     this.energy = damp(this.energy, wanted, 0.85, dt);
     this.swell = damp(this.swell, wanted, 0.3, dt);
     /* and the colour drains away as the music does, so silence looks like
@@ -180,11 +198,11 @@ export class Background {
     ctx.fillRect(0, 0, w, h);
 
     ctx.globalCompositeOperation = 'screen';
-    /* Brighter than it was, and slower. Size follows the pulse and colour
-       follows the swell, both heavily damped, so the backdrop lifts and settles
-       over seconds. Nothing in here is allowed to move fast enough to read as a
-       flash. */
-    const boost = 1 + this.energy * 0.22;
+    /* Three contributions, all of them bounded. The beat swells the light, the
+       pulse breathes it, and the swell shifts its colour. The beat carries the
+       most weight because that is what the eye reads as "the music is here",
+       but it is a wavefront crossing a soft gradient, not a flashbulb. */
+    const boost = 1 + this.energy * 0.22 + this.beat * 0.3;
     const dim = 1 - this.quiet * 0.42;
 
     for (const b of this.blobs) {
@@ -201,8 +219,8 @@ export class Background {
          a paused site reads as still and a playing one as alive */
       if (this.quiet > 0.002) col = mixRgb(col, greyOf(col), this.quiet * 0.82);
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-      g.addColorStop(0, rgba(col, (0.54 + this.energy * 0.3) * dim));
-      g.addColorStop(0.45, rgba(col, (0.2 + this.swell * 0.16) * dim));
+      g.addColorStop(0, rgba(col, (0.5 + this.energy * 0.3 + this.beat * 0.34) * dim));
+      g.addColorStop(0.45, rgba(col, (0.18 + this.swell * 0.16 + this.beat * 0.12) * dim));
       g.addColorStop(1, rgba(col, 0));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);

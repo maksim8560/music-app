@@ -129,6 +129,51 @@ kbd {
     radial-gradient(120% 90% at 50% -20%, color-mix(in oklab, var(--bg-2) 90%, var(--accent-a) 10%), var(--bg) 70%);
 }
 
+/* ------------------------------ theme wash -------------------------------- */
+/* Switching the theme used to be an instant flip, which on a page this glassy
+   reads as a glitch. Instead a soft disc of the incoming colour opens from the
+   button that caused the change and thins as it grows, so the new theme appears
+   to spread out of the button and dissipate rather than to be swapped.
+
+   The disc is scaled rather than resized, so the gradient inside stretches with
+   it and the edge stays soft the whole way across. The radius is 60vmax and it
+   grows to 2.3x: that puts the soft outer edge at roughly the far corner of the
+   screen halfway through, so the leading edge is actually visible sweeping
+   outwards, and past the edge by the end. A radius that already covered the
+   viewport would tint everything flat and the wave would be invisible. */
+.theme-wash {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-wash);
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: var(--wash-x, 50%) var(--wash-y, 50%);
+  transform: scale(0.04);
+  background:
+    radial-gradient(circle 60vmax at var(--wash-x, 50%) var(--wash-y, 50%),
+      var(--wash-in, #fff) 0%,
+      var(--wash-mid, #eee) 38%,
+      var(--wash-out, transparent) 78%,
+      transparent 100%);
+  will-change: transform, opacity;
+}
+
+.theme-wash[data-run] {
+  animation: wash-open 860ms cubic-bezier(0.12, 0.8, 0.22, 1) forwards;
+}
+
+@keyframes wash-open {
+  0% { transform: scale(0.04); opacity: 0.96; }
+  /* hold the strength while the edge is still crossing the screen: fading here
+     would leave a visible ring instead of a wave */
+  55% { opacity: 0.82; }
+  100% { transform: scale(2.3); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-wash { display: none; }
+}
+
 /* The canvas is drawn at 0.22 scale and stretched to full size — the GPU's
    bilinear upscale IS the blur, so no filter:blur() pass is needed (a 52px
    blur over a viewport-sized layer on every repaint was the main lag source) */

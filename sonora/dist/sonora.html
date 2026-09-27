@@ -77,6 +77,9 @@
   --z-sheet: 60;
   --z-palette: 80;
   --z-toast: 90;
+  /* the theme wash covers the page, so it sits above the sheets and the
+     palette; nothing takes a click from it, so it never traps anything */
+  --z-wash: 95;
 }
 
 /* ------------------------------- dark ---------------------------------- */
@@ -293,6 +296,51 @@ kbd {
   overflow: hidden;
   background:
     radial-gradient(120% 90% at 50% -20%, color-mix(in oklab, var(--bg-2) 90%, var(--accent-a) 10%), var(--bg) 70%);
+}
+
+/* ------------------------------ theme wash -------------------------------- */
+/* Switching the theme used to be an instant flip, which on a page this glassy
+   reads as a glitch. Instead a soft disc of the incoming colour opens from the
+   button that caused the change and thins as it grows, so the new theme appears
+   to spread out of the button and dissipate rather than to be swapped.
+
+   The disc is scaled rather than resized, so the gradient inside stretches with
+   it and the edge stays soft the whole way across. The radius is 60vmax and it
+   grows to 2.3x: that puts the soft outer edge at roughly the far corner of the
+   screen halfway through, so the leading edge is actually visible sweeping
+   outwards, and past the edge by the end. A radius that already covered the
+   viewport would tint everything flat and the wave would be invisible. */
+.theme-wash {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-wash);
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: var(--wash-x, 50%) var(--wash-y, 50%);
+  transform: scale(0.04);
+  background:
+    radial-gradient(circle 60vmax at var(--wash-x, 50%) var(--wash-y, 50%),
+      var(--wash-in, #fff) 0%,
+      var(--wash-mid, #eee) 38%,
+      var(--wash-out, transparent) 78%,
+      transparent 100%);
+  will-change: transform, opacity;
+}
+
+.theme-wash[data-run] {
+  animation: wash-open 860ms cubic-bezier(0.12, 0.8, 0.22, 1) forwards;
+}
+
+@keyframes wash-open {
+  0% { transform: scale(0.04); opacity: 0.96; }
+  /* hold the strength while the edge is still crossing the screen: fading here
+     would leave a visible ring instead of a wave */
+  55% { opacity: 0.82; }
+  100% { transform: scale(2.3); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-wash { display: none; }
 }
 
 /* The canvas is drawn at 0.22 scale and stretched to full size — the GPU's
@@ -2875,6 +2923,12 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
   <div class="stage__veil"></div>
   <div class="stage__grain"></div>
 </div>
+
+<!-- The wash that carries a theme change across the page: a soft circle of the
+     incoming colour opening from wherever the change was triggered, thinning
+     out as it grows. Purely decorative, so it is hidden from assistive tech and
+     never takes a click. -->
+<div class="theme-wash" id="theme-wash" aria-hidden="true"></div>
 
 <a class="skip-link" href="#library">К содержимому</a>
 
@@ -6335,8 +6389,8 @@ class Player {
       if (!sounding && wasPlaying && engine.currentTrack) this.#latch(true);
       toast(
         track.source === 'url'
-          ? `РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃСЃС‹Р»РєСѓ вЂ” СЃРµСЂРІРµСЂ РјРѕР¶РµС‚ РЅРµ РѕС‚РґР°РІР°С‚СЊ CORS (${String(err.message || err)})`
-          : 'РќРµ СѓРґР°Р»РѕСЃСЊ РґРµРєРѕРґРёСЂРѕРІР°С‚СЊ С„Р°Р№Р»',
+          ? `Не удалось загрузить ссылку — сервер может не отдавать CORS (${String(err.message || err)})`
+          : 'Не удалось декодировать файл',
         'error',
       );
     }
@@ -6363,7 +6417,7 @@ class Player {
          from a radio. Try the element anyway: a stream plays cross-origin just
          fine, and only a real file needs the bytes. */
       if (await this.#tryAsStream(track)) return;
-      throw new Error(`СЃРµСЂРІРµСЂ РЅРµ РѕС‚РґР°Р» CORS (${String(err.message || err)})`);
+      throw new Error(`сервер не отдал CORS (${String(err.message || err)})`);
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -6395,11 +6449,11 @@ class Player {
          blocks it outright. Say exactly that instead of a bare failure вЂ” it is
          the one case the admin cannot fix from here. */
       if (location.protocol === 'https:' && track.url.startsWith('http://')) {
-        throw new Error('СЌС„РёСЂ РѕС‚РґР°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ РїРѕ http, Р° СЃР°Р№С‚ РѕС‚РєСЂС‹С‚ РїРѕ https вЂ” Р±СЂР°СѓР·РµСЂ Р±Р»РѕРєРёСЂСѓРµС‚ С‚Р°РєРѕРµ СЃРјРµС€Р°РЅРЅРѕРµ СЃРѕРґРµСЂР¶РёРјРѕРµ');
+        throw new Error('эфир отдаётся только по http, а сайт открыт по https — браузер блокирует такое смешанное содержимое');
       }
       return false;
     }
-    /* remember the finding: next time the transport can say "СЌС„РёСЂ" up front
+    /* remember the finding: next time the transport can say "эфир" up front
        instead of re-discovering it on every single play */
     track.source = 'stream';
     admin.setSource(track.id, 'stream');
@@ -6435,7 +6489,7 @@ class Player {
       const first = this.visible()[0] || this.ordered()[0];
       if (first) return this.play(first);
       /* an empty shelf is not an error, but a dead в–¶ button is confusing */
-      toast('РњСѓР·С‹РєРё РїРѕРєР° РЅРµС‚ вЂ” РґРѕР±Р°РІСЊС‚Рµ С‚СЂРµРє РїРѕ СЃСЃС‹Р»РєРµ РІ Р°РґРјРёРЅ-РїР°РЅРµР»Рё', 'info', 5000);
+      toast('Музыки пока нет — добавьте трек по ссылке в админ-панели', 'info', 5000);
       return;
     }
     if (!engine.voice && !engine.isLive) {
@@ -6511,7 +6565,7 @@ class Player {
     queue.unshift(id);
     store.set({ queue });
     const t = this.byId(id);
-    toast(`В«${t?.title ?? 'РўСЂРµРє'}В» вЂ” РёРіСЂР°РµС‚ СЃР»РµРґСѓСЋС‰РёРј`, 'info');
+    toast(`«${t?.title ?? 'Трек'}» — играет следующим`, 'info');
   }
 
   enqueue(id) {
@@ -6519,7 +6573,7 @@ class Player {
     if (!queue.includes(id)) queue.push(id);
     store.set({ queue });
     const t = this.byId(id);
-    toast(`В«${t?.title ?? 'РўСЂРµРє'}В» РґРѕР±Р°РІР»РµРЅ РІ РѕС‡РµСЂРµРґСЊ`, 'ok');
+    toast(`«${t?.title ?? 'Трек'}» добавлен в очередь`, 'ok');
   }
 
   clearQueue() {
@@ -6546,7 +6600,7 @@ class Player {
     else likes.add(id);
     store.set({ likes: [...likes] });
     const track = this.byId(id);
-    if (track) toast(on ? `РЈР±СЂР°РЅРѕ РёР· РёР·Р±СЂР°РЅРЅРѕРіРѕ` : `В«${track.title}В» РІ РёР·Р±СЂР°РЅРЅРѕРј`, on ? 'info' : 'ok');
+    if (track) toast(on ? `Убрано из избранного` : `«${track.title}» в избранном`, on ? 'info' : 'ok');
     return !on;
   }
 
@@ -6561,7 +6615,7 @@ class Player {
     const order = ['off', 'all', 'one'];
     const next = order[(order.indexOf(store.get('repeat')) + 1) % order.length];
     store.set({ repeat: next });
-    toast({ off: 'РџРѕРІС‚РѕСЂ РІС‹РєР»СЋС‡РµРЅ', all: 'РџРѕРІС‚РѕСЂ РІСЃРµР№ РѕС‡РµСЂРµРґРё', one: 'РџРѕРІС‚РѕСЂ РѕРґРЅРѕРіРѕ С‚СЂРµРєР°' }[next], 'info');
+    toast({ off: 'Повтор выключен', all: 'Повтор всей очереди', one: 'Повтор одного трека' }[next], 'info');
     return next;
   }
 
@@ -6608,7 +6662,7 @@ class Player {
   async addFiles(fileList) {
     const files = Array.from(fileList).filter(isAudioFile);
     if (!files.length) {
-      toast('РџРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ Р°СѓРґРёРѕС„Р°Р№Р»С‹: MP3, WAV, OGG, M4A, FLAC', 'error');
+      toast('Поддерживаются аудиофайлы: MP3, WAV, OGG, M4A, FLAC', 'error');
       return [];
     }
     const added = [];
@@ -6620,7 +6674,7 @@ class Player {
     }
     if (added.length) {
       store.set({ order: [...(store.get('order') || []), ...added.map((t) => t.id)] });
-      toast(`Р”РѕР±Р°РІР»РµРЅРѕ ${added.length} ${added.length === 1 ? 'С‚СЂРµРє' : 'С‚СЂРµРєР°'}`, 'ok');
+      toast(`Добавлено ${added.length} ${added.length === 1 ? 'трек' : 'трека'}`, 'ok');
     }
     return added;
   }
@@ -8635,15 +8689,23 @@ class Background {
     this.floor = 0;
     this.air = 0;
     this.swell = 0;
-    /* Beats are a different animal again: a drum is a transient, not a level.
-       There was a detector here that found each onset and kicked the backdrop
-       on it, and it was wrong. Brightness pulsing on every hit is a strobe:
-       at eight hits in five seconds the whole screen throbbed, which reads as
-       an epileptic'srave rather than as light, and flashing that hard is a
-       genuine photosensitivity trigger rather than a matter of taste. So there
-       is no per-hit term any more - the reaction is the slow pulse and the
-       slower swell, and a beat reaches the eye as a breath, not as a flash. */
+    /* A beat is a transient, not a level, and a backdrop that ignores it looks
+       dead next to one that answers it. The shape matters far more than the
+       amount: this is a swell, not a flash. It opens over roughly 70ms and
+       closes over roughly 180ms, which reads as the light breathing with the
+       drums.
+
+       The first attempt set it to full the instant an onset appeared and let it
+       flicker away. At a few hits a second that is a strobe, and a strobe is a
+       genuine problem for anyone sensitive to flashing light rather than a
+       matter of taste — it was reported as "feels like a rave for an epileptic",
+       which is exactly what it was. So: an attack that is quick but never
+       instantaneous, a release slower than the attack, and a ceiling on how far
+       the screen is allowed to move. */
+    this.fast = 0;
     this.slow = 0;
+    this.beat = 0;
+    this.lastBeat = -1;
     /* 1 while nothing is playing: the backdrop goes grey and settles. */
     this.quiet = 1;
     this.reactive = true;
@@ -8744,11 +8806,21 @@ class Background {
     this.slow = damp(this.slow, level, 1.1, dt);
     this.air = damp(this.air, air, 1.0, dt);
 
+    /* The beat itself. A quick follower chases the band, a slow one trails it,
+       and the distance between them is the transient — a kick or a snare is
+       exactly that: a spike the running average never sees. A short refractory
+       window keeps one hit from being counted three times. */
+    this.fast = damp(this.fast, level, 16, dt);
+    if (playing && !still && this.fast - this.slow > 0.022 && this.t - this.lastBeat > 0.14) {
+      this.lastBeat = this.t;
+      this.beat = 1;
+    }
+    /* the swell: quick to open, slower to close, and never a step */
+    this.beat = this.beat > 0 ? damp(this.beat, 0, 5.5, dt) : damp(this.beat, 0, 18, dt);
+    this.beat = Math.min(this.beat, 0.92);
+
     const pulse = clamp01((level - this.floor) * 3.2) * 0.55 + this.air * 0.45;
     const wanted = this.reactive ? pulse : 0;
-    /* Slow enough that nothing on the page ever snaps. A backdrop that answers
-       a beat within a frame is a light show; this one takes a second or two to
-       open and the same again to close. */
     this.energy = damp(this.energy, wanted, 0.85, dt);
     this.swell = damp(this.swell, wanted, 0.3, dt);
     /* and the colour drains away as the music does, so silence looks like
@@ -8761,11 +8833,11 @@ class Background {
     ctx.fillRect(0, 0, w, h);
 
     ctx.globalCompositeOperation = 'screen';
-    /* Brighter than it was, and slower. Size follows the pulse and colour
-       follows the swell, both heavily damped, so the backdrop lifts and settles
-       over seconds. Nothing in here is allowed to move fast enough to read as a
-       flash. */
-    const boost = 1 + this.energy * 0.22;
+    /* Three contributions, all of them bounded. The beat swells the light, the
+       pulse breathes it, and the swell shifts its colour. The beat carries the
+       most weight because that is what the eye reads as "the music is here",
+       but it is a wavefront crossing a soft gradient, not a flashbulb. */
+    const boost = 1 + this.energy * 0.22 + this.beat * 0.3;
     const dim = 1 - this.quiet * 0.42;
 
     for (const b of this.blobs) {
@@ -8782,8 +8854,8 @@ class Background {
          a paused site reads as still and a playing one as alive */
       if (this.quiet > 0.002) col = mixRgb(col, greyOf(col), this.quiet * 0.82);
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-      g.addColorStop(0, rgba(col, (0.54 + this.energy * 0.3) * dim));
-      g.addColorStop(0.45, rgba(col, (0.2 + this.swell * 0.16) * dim));
+      g.addColorStop(0, rgba(col, (0.5 + this.energy * 0.3 + this.beat * 0.34) * dim));
+      g.addColorStop(0.45, rgba(col, (0.18 + this.swell * 0.16 + this.beat * 0.12) * dim));
       g.addColorStop(1, rgba(col, 0));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
@@ -8846,10 +8918,58 @@ function applyTheme() {
   btn.title = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
 }
 
-function toggleTheme() {
+/** the palette a wash should carry for a given theme */
+const WASH = {
+  light: { in: '#ffffff', mid: '#eef0f8', out: 'rgba(255,255,255,0)' },
+  dark: { in: '#0a0a12', mid: '#10101c', out: 'rgba(10,10,18,0)' },
+};
+
+let washTimer = 0;
+
+/**
+ * Spread the new theme across the page from a point, then let it dissipate.
+ *
+ * The real theme is swapped a third of the way through, while the disc is
+ * opaque and covering most of the viewport, so what the eye sees is the colour
+ * arriving and thinning rather than a cut. Called with no point - the keyboard
+ * shortcut - the change comes from the middle of the page, which reads better
+ * than an arbitrary corner nobody was looking at.
+ */
+function runThemeWash(next, x, y) {
+  const wash = document.getElementById('theme-wash');
+  if (!wash) return false;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+
+  const palette = WASH[next] || WASH.dark;
+  wash.style.setProperty('--wash-x', `${Math.round(x)}px`);
+  wash.style.setProperty('--wash-y', `${Math.round(y)}px`);
+  wash.style.setProperty('--wash-in', palette.in);
+  wash.style.setProperty('--wash-mid', palette.mid);
+  wash.style.setProperty('--wash-out', palette.out);
+
+  clearTimeout(washTimer);
+  /* restart the animation even if it was mid-flight */
+  wash.removeAttribute('data-run');
+  void wash.offsetWidth;
+  wash.setAttribute('data-run', '');
+
+  washTimer = setTimeout(() => {
+    store.patchSettings({ theme: next });
+    applyTheme();
+    setTimeout(() => wash.removeAttribute('data-run'), 900);
+  }, 300);
+  return true;
+}
+
+function toggleTheme(at) {
   const next = store.get('settings').theme === 'dark' ? 'light' : 'dark';
-  store.patchSettings({ theme: next });
-  applyTheme();
+  const x = at && at.clientX ? at.clientX : window.innerWidth / 2;
+  const y = at && at.clientY ? at.clientY : window.innerHeight / 2;
+  /* no wash available - fall back to the plain switch rather than swallowing it */
+  if (!runThemeWash(next, x, y)) {
+    store.patchSettings({ theme: next });
+    applyTheme();
+  }
 }
 
 /* -------------------------------- init ---------------------------------- */
@@ -8922,7 +9042,9 @@ function initSettings(hooks = {}) {
     setTimeout(() => location.reload(), 400);
   });
 
-  document.getElementById('btn-theme').addEventListener('click', toggleTheme);
+  /* the click is passed on so the wash opens where the finger was, not from
+     the middle of the page */
+  document.getElementById('btn-theme').addEventListener('click', (e) => toggleTheme(e));
   document.getElementById('btn-queue').addEventListener('click', () => {
     if (queueSheet.hidden) openQueueSheet();
     else closeSheet(queueSheet);

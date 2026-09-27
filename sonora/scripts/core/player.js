@@ -207,8 +207,8 @@ class Player {
       if (!sounding && wasPlaying && engine.currentTrack) this.#latch(true);
       toast(
         track.source === 'url'
-          ? `РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃСЃС‹Р»РєСѓ вЂ” СЃРµСЂРІРµСЂ РјРѕР¶РµС‚ РЅРµ РѕС‚РґР°РІР°С‚СЊ CORS (${String(err.message || err)})`
-          : 'РќРµ СѓРґР°Р»РѕСЃСЊ РґРµРєРѕРґРёСЂРѕРІР°С‚СЊ С„Р°Р№Р»',
+          ? `Не удалось загрузить ссылку — сервер может не отдавать CORS (${String(err.message || err)})`
+          : 'Не удалось декодировать файл',
         'error',
       );
     }
@@ -235,7 +235,7 @@ class Player {
          from a radio. Try the element anyway: a stream plays cross-origin just
          fine, and only a real file needs the bytes. */
       if (await this.#tryAsStream(track)) return;
-      throw new Error(`СЃРµСЂРІРµСЂ РЅРµ РѕС‚РґР°Р» CORS (${String(err.message || err)})`);
+      throw new Error(`сервер не отдал CORS (${String(err.message || err)})`);
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -267,11 +267,11 @@ class Player {
          blocks it outright. Say exactly that instead of a bare failure вЂ” it is
          the one case the admin cannot fix from here. */
       if (location.protocol === 'https:' && track.url.startsWith('http://')) {
-        throw new Error('СЌС„РёСЂ РѕС‚РґР°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ РїРѕ http, Р° СЃР°Р№С‚ РѕС‚РєСЂС‹С‚ РїРѕ https вЂ” Р±СЂР°СѓР·РµСЂ Р±Р»РѕРєРёСЂСѓРµС‚ С‚Р°РєРѕРµ СЃРјРµС€Р°РЅРЅРѕРµ СЃРѕРґРµСЂР¶РёРјРѕРµ');
+        throw new Error('эфир отдаётся только по http, а сайт открыт по https — браузер блокирует такое смешанное содержимое');
       }
       return false;
     }
-    /* remember the finding: next time the transport can say "СЌС„РёСЂ" up front
+    /* remember the finding: next time the transport can say "эфир" up front
        instead of re-discovering it on every single play */
     track.source = 'stream';
     admin.setSource(track.id, 'stream');
@@ -307,7 +307,7 @@ class Player {
       const first = this.visible()[0] || this.ordered()[0];
       if (first) return this.play(first);
       /* an empty shelf is not an error, but a dead в–¶ button is confusing */
-      toast('РњСѓР·С‹РєРё РїРѕРєР° РЅРµС‚ вЂ” РґРѕР±Р°РІСЊС‚Рµ С‚СЂРµРє РїРѕ СЃСЃС‹Р»РєРµ РІ Р°РґРјРёРЅ-РїР°РЅРµР»Рё', 'info', 5000);
+      toast('Музыки пока нет — добавьте трек по ссылке в админ-панели', 'info', 5000);
       return;
     }
     if (!engine.voice && !engine.isLive) {
@@ -383,7 +383,7 @@ class Player {
     queue.unshift(id);
     store.set({ queue });
     const t = this.byId(id);
-    toast(`В«${t?.title ?? 'РўСЂРµРє'}В» вЂ” РёРіСЂР°РµС‚ СЃР»РµРґСѓСЋС‰РёРј`, 'info');
+    toast(`«${t?.title ?? 'Трек'}» — играет следующим`, 'info');
   }
 
   enqueue(id) {
@@ -391,7 +391,7 @@ class Player {
     if (!queue.includes(id)) queue.push(id);
     store.set({ queue });
     const t = this.byId(id);
-    toast(`В«${t?.title ?? 'РўСЂРµРє'}В» РґРѕР±Р°РІР»РµРЅ РІ РѕС‡РµСЂРµРґСЊ`, 'ok');
+    toast(`«${t?.title ?? 'Трек'}» добавлен в очередь`, 'ok');
   }
 
   clearQueue() {
@@ -418,7 +418,7 @@ class Player {
     else likes.add(id);
     store.set({ likes: [...likes] });
     const track = this.byId(id);
-    if (track) toast(on ? `РЈР±СЂР°РЅРѕ РёР· РёР·Р±СЂР°РЅРЅРѕРіРѕ` : `В«${track.title}В» РІ РёР·Р±СЂР°РЅРЅРѕРј`, on ? 'info' : 'ok');
+    if (track) toast(on ? `Убрано из избранного` : `«${track.title}» в избранном`, on ? 'info' : 'ok');
     return !on;
   }
 
@@ -433,7 +433,7 @@ class Player {
     const order = ['off', 'all', 'one'];
     const next = order[(order.indexOf(store.get('repeat')) + 1) % order.length];
     store.set({ repeat: next });
-    toast({ off: 'РџРѕРІС‚РѕСЂ РІС‹РєР»СЋС‡РµРЅ', all: 'РџРѕРІС‚РѕСЂ РІСЃРµР№ РѕС‡РµСЂРµРґРё', one: 'РџРѕРІС‚РѕСЂ РѕРґРЅРѕРіРѕ С‚СЂРµРєР°' }[next], 'info');
+    toast({ off: 'Повтор выключен', all: 'Повтор всей очереди', one: 'Повтор одного трека' }[next], 'info');
     return next;
   }
 
@@ -480,7 +480,7 @@ class Player {
   async addFiles(fileList) {
     const files = Array.from(fileList).filter(isAudioFile);
     if (!files.length) {
-      toast('РџРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ Р°СѓРґРёРѕС„Р°Р№Р»С‹: MP3, WAV, OGG, M4A, FLAC', 'error');
+      toast('Поддерживаются аудиофайлы: MP3, WAV, OGG, M4A, FLAC', 'error');
       return [];
     }
     const added = [];
@@ -492,7 +492,7 @@ class Player {
     }
     if (added.length) {
       store.set({ order: [...(store.get('order') || []), ...added.map((t) => t.id)] });
-      toast(`Р”РѕР±Р°РІР»РµРЅРѕ ${added.length} ${added.length === 1 ? 'С‚СЂРµРє' : 'С‚СЂРµРєР°'}`, 'ok');
+      toast(`Добавлено ${added.length} ${added.length === 1 ? 'трек' : 'трека'}`, 'ok');
     }
     return added;
   }

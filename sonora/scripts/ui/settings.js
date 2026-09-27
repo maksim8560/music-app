@@ -35,10 +35,58 @@ export function applyTheme() {
   btn.title = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
 }
 
-export function toggleTheme() {
+/** the palette a wash should carry for a given theme */
+const WASH = {
+  light: { in: '#ffffff', mid: '#eef0f8', out: 'rgba(255,255,255,0)' },
+  dark: { in: '#0a0a12', mid: '#10101c', out: 'rgba(10,10,18,0)' },
+};
+
+let washTimer = 0;
+
+/**
+ * Spread the new theme across the page from a point, then let it dissipate.
+ *
+ * The real theme is swapped a third of the way through, while the disc is
+ * opaque and covering most of the viewport, so what the eye sees is the colour
+ * arriving and thinning rather than a cut. Called with no point - the keyboard
+ * shortcut - the change comes from the middle of the page, which reads better
+ * than an arbitrary corner nobody was looking at.
+ */
+function runThemeWash(next, x, y) {
+  const wash = document.getElementById('theme-wash');
+  if (!wash) return false;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+
+  const palette = WASH[next] || WASH.dark;
+  wash.style.setProperty('--wash-x', `${Math.round(x)}px`);
+  wash.style.setProperty('--wash-y', `${Math.round(y)}px`);
+  wash.style.setProperty('--wash-in', palette.in);
+  wash.style.setProperty('--wash-mid', palette.mid);
+  wash.style.setProperty('--wash-out', palette.out);
+
+  clearTimeout(washTimer);
+  /* restart the animation even if it was mid-flight */
+  wash.removeAttribute('data-run');
+  void wash.offsetWidth;
+  wash.setAttribute('data-run', '');
+
+  washTimer = setTimeout(() => {
+    store.patchSettings({ theme: next });
+    applyTheme();
+    setTimeout(() => wash.removeAttribute('data-run'), 900);
+  }, 300);
+  return true;
+}
+
+export function toggleTheme(at) {
   const next = store.get('settings').theme === 'dark' ? 'light' : 'dark';
-  store.patchSettings({ theme: next });
-  applyTheme();
+  const x = at && at.clientX ? at.clientX : window.innerWidth / 2;
+  const y = at && at.clientY ? at.clientY : window.innerHeight / 2;
+  /* no wash available - fall back to the plain switch rather than swallowing it */
+  if (!runThemeWash(next, x, y)) {
+    store.patchSettings({ theme: next });
+    applyTheme();
+  }
 }
 
 /* -------------------------------- init ---------------------------------- */
@@ -111,7 +159,9 @@ export function initSettings(hooks = {}) {
     setTimeout(() => location.reload(), 400);
   });
 
-  document.getElementById('btn-theme').addEventListener('click', toggleTheme);
+  /* the click is passed on so the wash opens where the finger was, not from
+     the middle of the page */
+  document.getElementById('btn-theme').addEventListener('click', (e) => toggleTheme(e));
   document.getElementById('btn-queue').addEventListener('click', () => {
     if (queueSheet.hidden) openQueueSheet();
     else closeSheet(queueSheet);
