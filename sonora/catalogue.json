@@ -112,9 +112,15 @@
         "radio-3",
         "radio-4"
       ]
+    },
+    {
+      "id": "pl-1",
+      "name": "Песни",
+      "icon": "note",
+      "trackIds": []
     }
   ],
-  "updatedAt": 1790502680988,
+  "updatedAt": 1790502698597,
   "genres": [
     {
       "key": "muzyka",
@@ -122,5 +128,5 @@
       "color": "#7ff221"
     }
   ],
-  "exportedAt": "2026-09-27T09:51:22.190Z"
+  "exportedAt": "2026-09-27T09:51:39.798Z"
 }
