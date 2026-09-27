@@ -26,6 +26,71 @@
    Single source of truth for colour, rhythm, motion and depth.
    ========================================================================== */
 
+/* ------------------------- animatable colours --------------------------- */
+/* A custom property is just a string to CSS, so a theme change makes every one
+   of these jump at once and the whole page snaps. Registering them with
+   `@property` is what turns them into real animatable values: from here on a
+   single transition on :root cross-fades all of them, and every colour, border
+   and glass tint derived from them follows along by itself. No rule anywhere
+   else has to know this happened.
+
+   Only colours and the grain opacity are listed. --glass-blur is deliberately
+   left out: it feeds a backdrop-filter on every panel, and interpolating it
+   would re-composite each of those for the length of the change. Shadows,
+   gradients and the ink tuple cannot be registered as a single value. */
+@property --bg { syntax: '<color>'; inherits: true; initial-value: #06060a; }
+@property --bg-2 { syntax: '<color>'; inherits: true; initial-value: #0b0b12; }
+@property --text { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.94); }
+@property --text-2 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.62); }
+@property --text-3 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.38); }
+@property --text-4 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.22); }
+@property --glass { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.055); }
+@property --glass-2 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.085); }
+@property --glass-3 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.13); }
+@property --glass-line { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.1); }
+@property --glass-line-2 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.16); }
+@property --glass-spec { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.22); }
+@property --fill-1 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.045); }
+@property --fill-2 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.085); }
+@property --fill-3 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.14); }
+@property --accent-a { syntax: '<color>'; inherits: true; initial-value: #7c8cff; }
+@property --accent-b { syntax: '<color>'; inherits: true; initial-value: #c07cff; }
+@property --accent-ink { syntax: '<color>'; inherits: true; initial-value: #ffffff; }
+@property --grain-opacity { syntax: '<number>'; inherits: true; initial-value: 0.42; }
+
+/* Long enough to be a change rather than a flicker, and eased the way the rest
+   of the interface moves. The theme wash runs underneath this at the same
+   time, so the colour arrives as a wave and the page settles into it. */
+:root {
+  transition:
+    --bg var(--d4) var(--ease),
+    --bg-2 var(--d4) var(--ease),
+    --text var(--d4) var(--ease),
+    --text-2 var(--d4) var(--ease),
+    --text-3 var(--d4) var(--ease),
+    --text-4 var(--d4) var(--ease),
+    --glass var(--d4) var(--ease),
+    --glass-2 var(--d4) var(--ease),
+    --glass-3 var(--d4) var(--ease),
+    --glass-line var(--d4) var(--ease),
+    --glass-line-2 var(--d4) var(--ease),
+    --glass-spec var(--d4) var(--ease),
+    --fill-1 var(--d4) var(--ease),
+    --fill-2 var(--d4) var(--ease),
+    --fill-3 var(--d4) var(--ease),
+    --accent-a var(--d4) var(--ease),
+    --accent-b var(--d4) var(--ease),
+    --accent-ink var(--d4) var(--ease),
+    --grain-opacity var(--d4) var(--ease);
+}
+
+/* Nothing should still be moving when the page is put away, and a user who has
+   asked for less motion gets the change outright rather than a slow fade. */
+@media (prefers-reduced-motion: reduce) {
+  :root { transition: none; }
+}
+
+
 :root {
   /* ---- type ---- */
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
@@ -300,16 +365,20 @@ kbd {
 
 /* ------------------------------ theme wash -------------------------------- */
 /* Switching the theme used to be an instant flip, which on a page this glassy
-   reads as a glitch. Instead a soft disc of the incoming colour opens from the
-   button that caused the change and thins as it grows, so the new theme appears
-   to spread out of the button and dissipate rather than to be swapped.
+   reads as a glitch. Now the colour arrives as a wave out of the button that
+   caused the change.
 
-   The disc is scaled rather than resized, so the gradient inside stretches with
-   it and the edge stays soft the whole way across. The radius is 60vmax and it
-   grows to 2.3x: that puts the soft outer edge at roughly the far corner of the
-   screen halfway through, so the leading edge is actually visible sweeping
-   outwards, and past the edge by the end. A radius that already covered the
-   viewport would tint everything flat and the wave would be invisible. */
+   Two layers make it read as water rather than as a growing circle. The body is
+   a wide radial falloff that supplies the colour and the soft leading edge; on
+   top of it a repeating gradient lays down evenly spaced rings, which travel
+   outwards with the transform and give the front of the wave some structure.
+   A single flat disc reads as a spotlight, and that is what looked cheap about
+   it.
+
+   Everything is scaled rather than resized, so the gradients stretch with it
+   and the edge stays soft the whole way across. 60vmax growing to 2.3x puts the
+   outer edge near the far corner of the screen halfway through, so the front is
+   genuinely visible sweeping outwards and past the edge by the end. */
 .theme-wash {
   position: fixed;
   inset: 0;
@@ -319,23 +388,26 @@ kbd {
   transform-origin: var(--wash-x, 50%) var(--wash-y, 50%);
   transform: scale(0.04);
   background:
+    repeating-radial-gradient(circle at var(--wash-x, 50%) var(--wash-y, 50%),
+      var(--wash-ripple, rgba(255, 255, 255, 0.5)) 0 0.9vmax,
+      transparent 0.9vmax 4.4vmax),
     radial-gradient(circle 60vmax at var(--wash-x, 50%) var(--wash-y, 50%),
       var(--wash-in, #fff) 0%,
-      var(--wash-mid, #eee) 38%,
-      var(--wash-out, transparent) 78%,
+      var(--wash-mid, #eee) 34%,
+      var(--wash-out, transparent) 74%,
       transparent 100%);
   will-change: transform, opacity;
 }
 
 .theme-wash[data-run] {
-  animation: wash-open 860ms cubic-bezier(0.12, 0.8, 0.22, 1) forwards;
+  animation: wash-open 900ms cubic-bezier(0.14, 0.82, 0.2, 1) forwards;
 }
 
 @keyframes wash-open {
-  0% { transform: scale(0.04); opacity: 0.96; }
-  /* hold the strength while the edge is still crossing the screen: fading here
-     would leave a visible ring instead of a wave */
-  55% { opacity: 0.82; }
+  0% { transform: scale(0.04); opacity: 0.95; }
+  /* hold the strength while the front is still crossing the screen: fading
+     here would leave a visible ring instead of a wave */
+  58% { opacity: 0.8; }
   100% { transform: scale(2.3); opacity: 0; }
 }
 
@@ -8920,20 +8992,24 @@ function applyTheme() {
 
 /** the palette a wash should carry for a given theme */
 const WASH = {
-  light: { in: '#ffffff', mid: '#eef0f8', out: 'rgba(255,255,255,0)' },
-  dark: { in: '#0a0a12', mid: '#10101c', out: 'rgba(10,10,18,0)' },
+  light: { in: '#ffffff', mid: '#eef0f8', out: 'rgba(255,255,255,0)', ripple: 'rgba(255,255,255,0.55)' },
+  dark: { in: '#0a0a12', mid: '#10101c', out: 'rgba(10,10,18,0)', ripple: 'rgba(190,196,255,0.42)' },
 };
 
 let washTimer = 0;
+let washClear = 0;
 
 /**
  * Spread the new theme across the page from a point, then let it dissipate.
  *
- * The real theme is swapped a third of the way through, while the disc is
- * opaque and covering most of the viewport, so what the eye sees is the colour
- * arriving and thinning rather than a cut. Called with no point - the keyboard
- * shortcut - the change comes from the middle of the page, which reads better
- * than an arbitrary corner nobody was looking at.
+ * The real theme is swapped about a third of the way through, while the wave is
+ * still opaque and covering most of the viewport, so what the eye sees is the
+ * colour arriving rather than a cut. From there the registered colour tokens
+ * keep easing on their own, so the page settles into the new theme instead of
+ * landing on it - the wave carries it, the tokens finish it.
+ *
+ * Called with no point - the keyboard shortcut - the change comes from the
+ * middle of the page, which reads better than a corner nobody was looking at.
  */
 function runThemeWash(next, x, y) {
   const wash = document.getElementById('theme-wash');
@@ -8946,8 +9022,10 @@ function runThemeWash(next, x, y) {
   wash.style.setProperty('--wash-in', palette.in);
   wash.style.setProperty('--wash-mid', palette.mid);
   wash.style.setProperty('--wash-out', palette.out);
+  wash.style.setProperty('--wash-ripple', palette.ripple);
 
   clearTimeout(washTimer);
+  clearTimeout(washClear);
   /* restart the animation even if it was mid-flight */
   wash.removeAttribute('data-run');
   void wash.offsetWidth;
@@ -8956,8 +9034,8 @@ function runThemeWash(next, x, y) {
   washTimer = setTimeout(() => {
     store.patchSettings({ theme: next });
     applyTheme();
-    setTimeout(() => wash.removeAttribute('data-run'), 900);
-  }, 300);
+    washClear = setTimeout(() => wash.removeAttribute('data-run'), 1000);
+  }, 320);
   return true;
 }
 

@@ -37,20 +37,24 @@ export function applyTheme() {
 
 /** the palette a wash should carry for a given theme */
 const WASH = {
-  light: { in: '#ffffff', mid: '#eef0f8', out: 'rgba(255,255,255,0)' },
-  dark: { in: '#0a0a12', mid: '#10101c', out: 'rgba(10,10,18,0)' },
+  light: { in: '#ffffff', mid: '#eef0f8', out: 'rgba(255,255,255,0)', ripple: 'rgba(255,255,255,0.55)' },
+  dark: { in: '#0a0a12', mid: '#10101c', out: 'rgba(10,10,18,0)', ripple: 'rgba(190,196,255,0.42)' },
 };
 
 let washTimer = 0;
+let washClear = 0;
 
 /**
  * Spread the new theme across the page from a point, then let it dissipate.
  *
- * The real theme is swapped a third of the way through, while the disc is
- * opaque and covering most of the viewport, so what the eye sees is the colour
- * arriving and thinning rather than a cut. Called with no point - the keyboard
- * shortcut - the change comes from the middle of the page, which reads better
- * than an arbitrary corner nobody was looking at.
+ * The real theme is swapped about a third of the way through, while the wave is
+ * still opaque and covering most of the viewport, so what the eye sees is the
+ * colour arriving rather than a cut. From there the registered colour tokens
+ * keep easing on their own, so the page settles into the new theme instead of
+ * landing on it - the wave carries it, the tokens finish it.
+ *
+ * Called with no point - the keyboard shortcut - the change comes from the
+ * middle of the page, which reads better than a corner nobody was looking at.
  */
 function runThemeWash(next, x, y) {
   const wash = document.getElementById('theme-wash');
@@ -63,8 +67,10 @@ function runThemeWash(next, x, y) {
   wash.style.setProperty('--wash-in', palette.in);
   wash.style.setProperty('--wash-mid', palette.mid);
   wash.style.setProperty('--wash-out', palette.out);
+  wash.style.setProperty('--wash-ripple', palette.ripple);
 
   clearTimeout(washTimer);
+  clearTimeout(washClear);
   /* restart the animation even if it was mid-flight */
   wash.removeAttribute('data-run');
   void wash.offsetWidth;
@@ -73,8 +79,8 @@ function runThemeWash(next, x, y) {
   washTimer = setTimeout(() => {
     store.patchSettings({ theme: next });
     applyTheme();
-    setTimeout(() => wash.removeAttribute('data-run'), 900);
-  }, 300);
+    washClear = setTimeout(() => wash.removeAttribute('data-run'), 1000);
+  }, 320);
   return true;
 }
 

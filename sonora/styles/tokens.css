@@ -3,6 +3,71 @@
    Single source of truth for colour, rhythm, motion and depth.
    ========================================================================== */
 
+/* ------------------------- animatable colours --------------------------- */
+/* A custom property is just a string to CSS, so a theme change makes every one
+   of these jump at once and the whole page snaps. Registering them with
+   `@property` is what turns them into real animatable values: from here on a
+   single transition on :root cross-fades all of them, and every colour, border
+   and glass tint derived from them follows along by itself. No rule anywhere
+   else has to know this happened.
+
+   Only colours and the grain opacity are listed. --glass-blur is deliberately
+   left out: it feeds a backdrop-filter on every panel, and interpolating it
+   would re-composite each of those for the length of the change. Shadows,
+   gradients and the ink tuple cannot be registered as a single value. */
+@property --bg { syntax: '<color>'; inherits: true; initial-value: #06060a; }
+@property --bg-2 { syntax: '<color>'; inherits: true; initial-value: #0b0b12; }
+@property --text { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.94); }
+@property --text-2 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.62); }
+@property --text-3 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.38); }
+@property --text-4 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.22); }
+@property --glass { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.055); }
+@property --glass-2 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.085); }
+@property --glass-3 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.13); }
+@property --glass-line { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.1); }
+@property --glass-line-2 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.16); }
+@property --glass-spec { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.22); }
+@property --fill-1 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.045); }
+@property --fill-2 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.085); }
+@property --fill-3 { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.14); }
+@property --accent-a { syntax: '<color>'; inherits: true; initial-value: #7c8cff; }
+@property --accent-b { syntax: '<color>'; inherits: true; initial-value: #c07cff; }
+@property --accent-ink { syntax: '<color>'; inherits: true; initial-value: #ffffff; }
+@property --grain-opacity { syntax: '<number>'; inherits: true; initial-value: 0.42; }
+
+/* Long enough to be a change rather than a flicker, and eased the way the rest
+   of the interface moves. The theme wash runs underneath this at the same
+   time, so the colour arrives as a wave and the page settles into it. */
+:root {
+  transition:
+    --bg var(--d4) var(--ease),
+    --bg-2 var(--d4) var(--ease),
+    --text var(--d4) var(--ease),
+    --text-2 var(--d4) var(--ease),
+    --text-3 var(--d4) var(--ease),
+    --text-4 var(--d4) var(--ease),
+    --glass var(--d4) var(--ease),
+    --glass-2 var(--d4) var(--ease),
+    --glass-3 var(--d4) var(--ease),
+    --glass-line var(--d4) var(--ease),
+    --glass-line-2 var(--d4) var(--ease),
+    --glass-spec var(--d4) var(--ease),
+    --fill-1 var(--d4) var(--ease),
+    --fill-2 var(--d4) var(--ease),
+    --fill-3 var(--d4) var(--ease),
+    --accent-a var(--d4) var(--ease),
+    --accent-b var(--d4) var(--ease),
+    --accent-ink var(--d4) var(--ease),
+    --grain-opacity var(--d4) var(--ease);
+}
+
+/* Nothing should still be moving when the page is put away, and a user who has
+   asked for less motion gets the change outright rather than a slow fade. */
+@media (prefers-reduced-motion: reduce) {
+  :root { transition: none; }
+}
+
+
 :root {
   /* ---- type ---- */
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
