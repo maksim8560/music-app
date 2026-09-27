@@ -130,21 +130,18 @@ kbd {
 }
 
 /* ------------------------------ theme wash -------------------------------- */
-/* Switching the theme used to be an instant flip, which on a page this glassy
-   reads as a glitch. Now the colour arrives as a wave out of the button that
-   caused the change.
+/* The change of theme is the wave. It is not a disc of colour painted over the
+   page from wherever a button happened to be: it opens in the middle of the
+   page and travels outwards, and the colour of everything it passes over goes
+   with it. A spotlight that happens to sit on top of an instant swap is a trick
+   - the page still changes all at once underneath, and that is the part that
+   looked cheap.
 
-   Two layers make it read as water rather than as a growing circle. The body is
-   a wide radial falloff that supplies the colour and the soft leading edge; on
-   top of it a repeating gradient lays down evenly spaced rings, which travel
-   outwards with the transform and give the front of the wave some structure.
-   A single flat disc reads as a spotlight, and that is what looked cheap about
-   it.
-
-   Everything is scaled rather than resized, so the gradients stretch with it
-   and the edge stays soft the whole way across. 60vmax growing to 2.3x puts the
-   outer edge near the far corner of the screen halfway through, so the front is
-   genuinely visible sweeping outwards and past the edge by the end. */
+   So the front is wide and soft, with rings laid along it to give it something
+   to read as a front, and the real theme flip is timed to land while the front
+   is still crossing. The registered colour tokens then keep easing, which is
+   what carries the change the rest of the way to the edges. The button is not
+   involved: a change triggered from anywhere arrives the same way. */
 .theme-wash {
   position: fixed;
   inset: 0;
@@ -155,26 +152,26 @@ kbd {
   transform: scale(0.04);
   background:
     repeating-radial-gradient(circle at var(--wash-x, 50%) var(--wash-y, 50%),
-      var(--wash-ripple, rgba(255, 255, 255, 0.5)) 0 0.9vmax,
-      transparent 0.9vmax 4.4vmax),
-    radial-gradient(circle 60vmax at var(--wash-x, 50%) var(--wash-y, 50%),
+      var(--wash-ripple, rgba(255, 255, 255, 0.5)) 0 1.1vmax,
+      transparent 1.1vmax 5.2vmax),
+    radial-gradient(circle 52vmax at var(--wash-x, 50%) var(--wash-y, 50%),
       var(--wash-in, #fff) 0%,
-      var(--wash-mid, #eee) 34%,
-      var(--wash-out, transparent) 74%,
+      var(--wash-mid, #eee) 26%,
+      var(--wash-out, transparent) 62%,
       transparent 100%);
   will-change: transform, opacity;
 }
 
 .theme-wash[data-run] {
-  animation: wash-open 900ms cubic-bezier(0.14, 0.82, 0.2, 1) forwards;
+  animation: wash-open 1150ms cubic-bezier(0.12, 0.78, 0.18, 1) forwards;
 }
 
 @keyframes wash-open {
-  0% { transform: scale(0.04); opacity: 0.95; }
-  /* hold the strength while the front is still crossing the screen: fading
-     here would leave a visible ring instead of a wave */
-  58% { opacity: 0.8; }
-  100% { transform: scale(2.3); opacity: 0; }
+  0% { transform: scale(0.04); opacity: 0.9; }
+  /* held while the front is still out on the page: fading here would leave a
+     visible ring instead of a wave travelling */
+  62% { opacity: 0.72; }
+  100% { transform: scale(2.6); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

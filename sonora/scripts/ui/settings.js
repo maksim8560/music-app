@@ -45,25 +45,30 @@ let washTimer = 0;
 let washClear = 0;
 
 /**
- * Spread the new theme across the page from a point, then let it dissipate.
+ * The wave the page changes colour in.
  *
- * The real theme is swapped about a third of the way through, while the wave is
- * still opaque and covering most of the viewport, so what the eye sees is the
- * colour arriving rather than a cut. From there the registered colour tokens
- * keep easing on their own, so the page settles into the new theme instead of
- * landing on it - the wave carries it, the tokens finish it.
+ * It always opens in the middle of the viewport. A wave that started at the
+ * button was a decoration attached to a control: it drew a spotlight where the
+ * finger was while the actual change still happened everywhere at once, and on
+ * a wide screen the front never even reached the far side before it faded.
+ * Starting from the middle means the front travels the same distance in every
+ * direction, so the whole page is crossed.
  *
- * Called with no point - the keyboard shortcut - the change comes from the
- * middle of the page, which reads better than a corner nobody was looking at.
+ * The real theme is swapped partway through, while the front is still out over
+ * the content, and the registered colour tokens keep easing afterwards - that
+ * is what carries the change out to the edges and settles it, rather than the
+ * page landing on the new theme in one step.
  */
-function runThemeWash(next, x, y) {
+function runThemeWash(next) {
   const wash = document.getElementById('theme-wash');
   if (!wash) return false;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
 
   const palette = WASH[next] || WASH.dark;
-  wash.style.setProperty('--wash-x', `${Math.round(x)}px`);
-  wash.style.setProperty('--wash-y', `${Math.round(y)}px`);
+  const x = Math.round(window.innerWidth / 2);
+  const y = Math.round(window.innerHeight / 2);
+  wash.style.setProperty('--wash-x', `${x}px`);
+  wash.style.setProperty('--wash-y', `${y}px`);
   wash.style.setProperty('--wash-in', palette.in);
   wash.style.setProperty('--wash-mid', palette.mid);
   wash.style.setProperty('--wash-out', palette.out);
@@ -73,23 +78,32 @@ function runThemeWash(next, x, y) {
   clearTimeout(washClear);
   /* restart the animation even if it was mid-flight */
   wash.removeAttribute('data-run');
+  wash.style.opacity = '';
   void wash.offsetWidth;
   wash.setAttribute('data-run', '');
 
+  /* the front is about a third of the way across the page at this point */
   washTimer = setTimeout(() => {
     store.patchSettings({ theme: next });
     applyTheme();
-    washClear = setTimeout(() => wash.removeAttribute('data-run'), 1000);
-  }, 320);
+    washClear = setTimeout(() => {
+      wash.removeAttribute('data-run');
+      /* The animation is what ends the wash, so if it never runs - a hidden tab
+         where the compositor has stopped advancing frames, a browser that
+         dropped the keyframes - the overlay would sit on the page at nearly full
+         opacity. Clearing it here as well means the worst case is a brief
+         missing transition rather than an unusable page. */
+      wash.style.opacity = '0';
+    }, 1250);
+  }, 420);
   return true;
 }
 
-export function toggleTheme(at) {
+export function toggleTheme() {
   const next = store.get('settings').theme === 'dark' ? 'light' : 'dark';
-  const x = at && at.clientX ? at.clientX : window.innerWidth / 2;
-  const y = at && at.clientY ? at.clientY : window.innerHeight / 2;
-  /* no wash available - fall back to the plain switch rather than swallowing it */
-  if (!runThemeWash(next, x, y)) {
+  /* no wash available, or motion is unwelcome - fall back to the plain switch
+     rather than swallowing the click */
+  if (!runThemeWash(next)) {
     store.patchSettings({ theme: next });
     applyTheme();
   }
@@ -165,9 +179,9 @@ export function initSettings(hooks = {}) {
     setTimeout(() => location.reload(), 400);
   });
 
-  /* the click is passed on so the wash opens where the finger was, not from
-     the middle of the page */
-  document.getElementById('btn-theme').addEventListener('click', (e) => toggleTheme(e));
+  /* the wave opens from the middle of the page, not from the button, so the
+     click position is not passed on */
+  document.getElementById('btn-theme').addEventListener('click', toggleTheme);
   document.getElementById('btn-queue').addEventListener('click', () => {
     if (queueSheet.hidden) openQueueSheet();
     else closeSheet(queueSheet);

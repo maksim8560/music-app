@@ -364,21 +364,18 @@ kbd {
 }
 
 /* ------------------------------ theme wash -------------------------------- */
-/* Switching the theme used to be an instant flip, which on a page this glassy
-   reads as a glitch. Now the colour arrives as a wave out of the button that
-   caused the change.
+/* The change of theme is the wave. It is not a disc of colour painted over the
+   page from wherever a button happened to be: it opens in the middle of the
+   page and travels outwards, and the colour of everything it passes over goes
+   with it. A spotlight that happens to sit on top of an instant swap is a trick
+   - the page still changes all at once underneath, and that is the part that
+   looked cheap.
 
-   Two layers make it read as water rather than as a growing circle. The body is
-   a wide radial falloff that supplies the colour and the soft leading edge; on
-   top of it a repeating gradient lays down evenly spaced rings, which travel
-   outwards with the transform and give the front of the wave some structure.
-   A single flat disc reads as a spotlight, and that is what looked cheap about
-   it.
-
-   Everything is scaled rather than resized, so the gradients stretch with it
-   and the edge stays soft the whole way across. 60vmax growing to 2.3x puts the
-   outer edge near the far corner of the screen halfway through, so the front is
-   genuinely visible sweeping outwards and past the edge by the end. */
+   So the front is wide and soft, with rings laid along it to give it something
+   to read as a front, and the real theme flip is timed to land while the front
+   is still crossing. The registered colour tokens then keep easing, which is
+   what carries the change the rest of the way to the edges. The button is not
+   involved: a change triggered from anywhere arrives the same way. */
 .theme-wash {
   position: fixed;
   inset: 0;
@@ -389,26 +386,26 @@ kbd {
   transform: scale(0.04);
   background:
     repeating-radial-gradient(circle at var(--wash-x, 50%) var(--wash-y, 50%),
-      var(--wash-ripple, rgba(255, 255, 255, 0.5)) 0 0.9vmax,
-      transparent 0.9vmax 4.4vmax),
-    radial-gradient(circle 60vmax at var(--wash-x, 50%) var(--wash-y, 50%),
+      var(--wash-ripple, rgba(255, 255, 255, 0.5)) 0 1.1vmax,
+      transparent 1.1vmax 5.2vmax),
+    radial-gradient(circle 52vmax at var(--wash-x, 50%) var(--wash-y, 50%),
       var(--wash-in, #fff) 0%,
-      var(--wash-mid, #eee) 34%,
-      var(--wash-out, transparent) 74%,
+      var(--wash-mid, #eee) 26%,
+      var(--wash-out, transparent) 62%,
       transparent 100%);
   will-change: transform, opacity;
 }
 
 .theme-wash[data-run] {
-  animation: wash-open 900ms cubic-bezier(0.14, 0.82, 0.2, 1) forwards;
+  animation: wash-open 1150ms cubic-bezier(0.12, 0.78, 0.18, 1) forwards;
 }
 
 @keyframes wash-open {
-  0% { transform: scale(0.04); opacity: 0.95; }
-  /* hold the strength while the front is still crossing the screen: fading
-     here would leave a visible ring instead of a wave */
-  58% { opacity: 0.8; }
-  100% { transform: scale(2.3); opacity: 0; }
+  0% { transform: scale(0.04); opacity: 0.9; }
+  /* held while the front is still out on the page: fading here would leave a
+     visible ring instead of a wave travelling */
+  62% { opacity: 0.72; }
+  100% { transform: scale(2.6); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -9000,25 +8997,30 @@ let washTimer = 0;
 let washClear = 0;
 
 /**
- * Spread the new theme across the page from a point, then let it dissipate.
+ * The wave the page changes colour in.
  *
- * The real theme is swapped about a third of the way through, while the wave is
- * still opaque and covering most of the viewport, so what the eye sees is the
- * colour arriving rather than a cut. From there the registered colour tokens
- * keep easing on their own, so the page settles into the new theme instead of
- * landing on it - the wave carries it, the tokens finish it.
+ * It always opens in the middle of the viewport. A wave that started at the
+ * button was a decoration attached to a control: it drew a spotlight where the
+ * finger was while the actual change still happened everywhere at once, and on
+ * a wide screen the front never even reached the far side before it faded.
+ * Starting from the middle means the front travels the same distance in every
+ * direction, so the whole page is crossed.
  *
- * Called with no point - the keyboard shortcut - the change comes from the
- * middle of the page, which reads better than a corner nobody was looking at.
+ * The real theme is swapped partway through, while the front is still out over
+ * the content, and the registered colour tokens keep easing afterwards - that
+ * is what carries the change out to the edges and settles it, rather than the
+ * page landing on the new theme in one step.
  */
-function runThemeWash(next, x, y) {
+function runThemeWash(next) {
   const wash = document.getElementById('theme-wash');
   if (!wash) return false;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
 
   const palette = WASH[next] || WASH.dark;
-  wash.style.setProperty('--wash-x', `${Math.round(x)}px`);
-  wash.style.setProperty('--wash-y', `${Math.round(y)}px`);
+  const x = Math.round(window.innerWidth / 2);
+  const y = Math.round(window.innerHeight / 2);
+  wash.style.setProperty('--wash-x', `${x}px`);
+  wash.style.setProperty('--wash-y', `${y}px`);
   wash.style.setProperty('--wash-in', palette.in);
   wash.style.setProperty('--wash-mid', palette.mid);
   wash.style.setProperty('--wash-out', palette.out);
@@ -9028,23 +9030,32 @@ function runThemeWash(next, x, y) {
   clearTimeout(washClear);
   /* restart the animation even if it was mid-flight */
   wash.removeAttribute('data-run');
+  wash.style.opacity = '';
   void wash.offsetWidth;
   wash.setAttribute('data-run', '');
 
+  /* the front is about a third of the way across the page at this point */
   washTimer = setTimeout(() => {
     store.patchSettings({ theme: next });
     applyTheme();
-    washClear = setTimeout(() => wash.removeAttribute('data-run'), 1000);
-  }, 320);
+    washClear = setTimeout(() => {
+      wash.removeAttribute('data-run');
+      /* The animation is what ends the wash, so if it never runs - a hidden tab
+         where the compositor has stopped advancing frames, a browser that
+         dropped the keyframes - the overlay would sit on the page at nearly full
+         opacity. Clearing it here as well means the worst case is a brief
+         missing transition rather than an unusable page. */
+      wash.style.opacity = '0';
+    }, 1250);
+  }, 420);
   return true;
 }
 
-function toggleTheme(at) {
+function toggleTheme() {
   const next = store.get('settings').theme === 'dark' ? 'light' : 'dark';
-  const x = at && at.clientX ? at.clientX : window.innerWidth / 2;
-  const y = at && at.clientY ? at.clientY : window.innerHeight / 2;
-  /* no wash available - fall back to the plain switch rather than swallowing it */
-  if (!runThemeWash(next, x, y)) {
+  /* no wash available, or motion is unwelcome - fall back to the plain switch
+     rather than swallowing the click */
+  if (!runThemeWash(next)) {
     store.patchSettings({ theme: next });
     applyTheme();
   }
@@ -9120,9 +9131,9 @@ function initSettings(hooks = {}) {
     setTimeout(() => location.reload(), 400);
   });
 
-  /* the click is passed on so the wash opens where the finger was, not from
-     the middle of the page */
-  document.getElementById('btn-theme').addEventListener('click', (e) => toggleTheme(e));
+  /* the wave opens from the middle of the page, not from the button, so the
+     click position is not passed on */
+  document.getElementById('btn-theme').addEventListener('click', toggleTheme);
   document.getElementById('btn-queue').addEventListener('click', () => {
     if (queueSheet.hidden) openQueueSheet();
     else closeSheet(queueSheet);
