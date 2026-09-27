@@ -4469,6 +4469,14 @@ class AudioEngine {
     this.volume = 0.72;
     this.muted = false;
     this.state = 'idle';    // idle | loading | playing | paused
+    /* the live stream's element, and the node feeding it into the graph when
+       the host allows that. `_streamInGraph` is the difference between a radio
+       the equalizer and the spectrum can see and one that goes straight to the
+       speakers, which is still the only option for a host that sends no CORS
+       headers — and nothing about playback depends on the answer. */
+    this._stream = null;
+    this._streamSource = null;
+    this._streamInGraph = false;
     this._listeners = new Map();
     this._endNotified = false;
   }
@@ -4623,13 +4631,19 @@ class AudioEngine {
   /**
    * A live radio stream has no end, so it can never be decoded up front:
    * `fetch()` + `arrayBuffer()` waits forever for a body that never completes,
-   * and the player would sit there loading until the tab closed. A cross-origin
-   * <audio> element also cannot be piped through Web Audio without CORS — once
-   * connected it outputs silence.
+   * and the player would sit there loading until the tab closed.
    *
-   * So a stream plays through the element itself, straight to the speakers,
-   * and the graph is left alone. The trade is honest and visible: no spectrum,
-   * no EQ, no seeking — the transport shows «прямой эфир» instead of a length.
+   * Whether it can be analysed is a separate question, and it used to be
+   * answered "no" unconditionally: a cross-origin <audio> element cannot be
+   * piped through Web Audio without CORS headers, because once connected an
+   * element with no CORS response outputs silence. So every stream went
+   * straight to the speakers and nothing in the graph ever saw it — no
+   * spectrum, no EQ, no level control from the mixer.
+   *
+   * That is now a fallback rather than the only path. Most of these hosts do
+   * answer with `Access-Control-Allow-Origin`, and for those the element can be
+   * connected and everything works. So it is tried first, and if the host
+   * refuses, exactly the old behaviour takes over.
    */
   #playStream(track) {
     this.playStream(track).then((ok) => {
@@ -4640,6 +4654,17 @@ class AudioEngine {
       this.emit('state', this.state);
     });
     return null;
+  }
+
+  /**
+   * Can a stream be routed into the graph at all?
+   *
+   * Only if the host sends CORS headers, and only if the context is already
+   * running — a suspended context would take the stream's audio with it, which
+   * is the one failure that turns "no visualizer" into "no sound".
+   */
+  get #graphReady() {
+    return Boolean(this.ctx && this.busSum && this.ctx.state === 'running');
   }
 
   /**
@@ -4654,16 +4679,53 @@ class AudioEngine {
    * @returns {Promise<boolean>}
    */
   async playStream(track) {
+    /* The graph has to exist and be running before there is anything to plug the
+       stream into, and on a first play neither is true yet: the context is
+       created and resumed a few lines further down `play()`, which streams used
+       to skip entirely because they never needed it. So unlock first — we are
+       inside the click that started this, which is the only moment a resume is
+       allowed — and only then decide which path is available. */
+    try {
+      await this.ensure();
+      await this.#unlock();
+    } catch { /* no Web Audio at all; the direct path still plays */ }
+    if (this.#graphReady && (await this.#tryStream(track, true))) return true;
+    return this.#tryStream(track, false);
+  }
+
+  /**
+   * One attempt at starting the element.
+   *
+   * `viaGraph` is the difference between an analysed, equalised stream and a
+   * bare one: it asks the host for CORS and, if the answer allows it, plugs the
+   * element into the mixer so the rest of the app can see and shape the sound.
+   * When the host says no, the element errors and the caller tries again the
+   * old way — playback is never traded away for a nicer display.
+   */
+  async #tryStream(track, viaGraph) {
     /* A fresh element per attempt, and nothing is torn down until the new one
        has proved itself. Reusing one element meant a dead link silenced
        whatever was already playing: the old src was replaced before we knew the
        replacement worked. */
     const el = new Audio();
     el.preload = 'none';
-    el.volume = this.muted ? 0 : this.volume;
-    /* No crossOrigin attribute on purpose: it would demand CORS headers the
-       radio does not send, and the element would refuse to play at all. */
+    /* in-graph the level belongs to the mixer; out of it, to the element */
+    el.volume = viaGraph ? 1 : (this.muted ? 0 : this.volume);
+    if (viaGraph) el.crossOrigin = 'anonymous';
     el.src = secureUrl(track.url);
+
+    let source = null;
+    if (viaGraph) {
+      try {
+        /* must happen before play(): the element's output is diverted into the
+           graph from the moment it is connected, so connecting afterwards
+           would briefly play straight to the speakers */
+        source = this.ctx.createMediaElementSource(el);
+        source.connect(this.busSum);
+      } catch {
+        return false;
+      }
+    }
 
     const started = await new Promise((resolve) => {
       let settled = false;
@@ -4691,6 +4753,7 @@ class AudioEngine {
       try {
         el.pause();
         el.removeAttribute('src');
+        source?.disconnect();
       } catch { /* it never got going */ }
       return false;
     }
@@ -4705,6 +4768,9 @@ class AudioEngine {
         old.load();
       } catch { /* already gone */ }
     }
+    this._streamSource?.disconnect();
+    this._streamSource = source;
+    this._streamInGraph = Boolean(source);
     el.playbackRate = 1;
     el.addEventListener('playing', () => {
       if (this.stream && this.state !== 'playing') {
@@ -4737,7 +4803,11 @@ class AudioEngine {
       this._stream.pause();
       this._stream.removeAttribute('src');
       this._stream.load();
+      /* released so the next stream is not measured against a dead node */
+      this._streamSource?.disconnect();
     } catch { /* the element is going away anyway */ }
+    this._streamSource = null;
+    this._streamInGraph = false;
   }
 
   /** Silence whatever is sounding, graph voice or stream alike. */
@@ -4894,8 +4964,10 @@ class AudioEngine {
 
   /* ------------------------------- mixer ------------------------------ */
   applyGain() {
-    /* a stream never enters the graph, so the element carries the level itself */
-    if (this._stream) this._stream.volume = this.muted ? 0 : this.volume;
+    /* Only a stream outside the graph carries its own level — once an element is
+       connected to the mixer its volume is ignored, the master gain is the
+       level, and setting both would halve it. */
+    if (this._stream && !this._streamInGraph) this._stream.volume = this.muted ? 0 : this.volume;
     if (!this.master) return;
     const target = this.muted ? 0 : this.volume;
     this.master.gain.setTargetAtTime(target, this.ctx.currentTime, 0.02);
@@ -4929,10 +5001,11 @@ class AudioEngine {
    * sidebar strip, background level) would otherwise pull the FFT 4x per frame.
    */
   spectrum() {
-    /* Nothing is feeding the analyser while a stream plays — report "no data"
-       rather than the graph's silence, so the visualizers hold still instead
-       of drawing a fake spectrum. */
-    if (this.stream) return null;
+    /* A stream that the host would not let into the graph is feeding the
+       analyser nothing at all, so report "no data" rather than the graph's
+       silence — the visualizers hold still instead of drawing a spectrum that
+       is not there. A stream that *did* get in is real audio and is reported. */
+    if (this.stream && !this._streamInGraph) return null;
     if (!this.analyser) return null;
     const t = this.ctx.currentTime;
     if (t === this._fftAt && this.ctx.state === 'running') return this.freq;
