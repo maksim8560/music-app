@@ -21,7 +21,6 @@ const DEFAULTS = {
   muted: false,
   shuffle: false,
   repeat: 'all',
-  eq: 'warm',
   queue: [],
   /* library meta */
   likes: [],
@@ -55,7 +54,7 @@ function load() {
 /** Keys that survive a reload. */
 const PERSIST = [
   'order', 'filter', 'view', 'currentId', 'position', 'volume', 'muted',
-  'shuffle', 'repeat', 'eq', 'queue', 'likes', 'recently', 'rail', 'settings',
+  'shuffle', 'repeat', 'queue', 'likes', 'recently', 'rail', 'settings',
 ];
 
 class Store {

@@ -49,7 +49,6 @@ const dom = {
   volume: $('volume'),
   mute: $('btn-mute'),
   playbar: $('playbar'),
-  chips: $('hero-chips'),
 };
 
 const RING_LEN = 292.2;
@@ -333,21 +332,6 @@ export function initTransport() {
     e.preventDefault();
     player.setVolume(store.get('volume') - e.deltaY * 0.0016);
   }, { passive: false });
-
-  /* --- EQ chips --- */
-  dom.chips?.addEventListener('click', (e) => {
-    const chip = e.target.closest('[data-eq]');
-    if (!chip) return;
-    player.setEq(chip.dataset.eq);
-    for (const c of dom.chips.querySelectorAll('[data-eq]')) c.classList.toggle('is-active', c === chip);
-  });
-
-  /* --- initial paint --- */
-  const eq = store.get('eq');
-  for (const c of dom.chips?.querySelectorAll('[data-eq]') || []) {
-    c.classList.toggle('is-active', c.dataset.eq === eq);
-  }
-  engine.setEq(eq);
 
   /* --- clock --- */
   addTask(updateClock);

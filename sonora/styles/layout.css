@@ -586,7 +586,6 @@
      column — tighten the gap so they stay on one line
      (`.hero` prefix: `.transport` itself lives in player.css) */
   .hero .transport { justify-content: center; gap: var(--gap-2); }
-  .chips { justify-content: center; }
 }
 
 @media (max-width: 980px) {
@@ -645,8 +644,7 @@
 @media (pointer: coarse) {
   .icon-btn,
   .side-list__item,
-  .side-list__add,
-  .chips .chip {
+  .side-list__add {
     min-height: 44px;
   }
   .play-btn { min-width: 52px; min-height: 52px; }

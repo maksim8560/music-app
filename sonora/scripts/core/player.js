@@ -455,11 +455,6 @@ class Player {
     return muted;
   }
 
-  setEq(name) {
-    store.set({ eq: name });
-    engine.setEq(name);
-  }
-
   setFilter(filter) {
     store.set({ filter, search: '' });
   }

@@ -195,8 +195,6 @@
   font-size: var(--t-micro);
 }
 
-.chips { display: flex; flex-wrap: wrap; gap: var(--gap-2); }
-
 /* live equaliser glyph */
 .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
 .eq b {

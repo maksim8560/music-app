@@ -1040,7 +1040,6 @@ kbd {
      column — tighten the gap so they stay on one line
      (`.hero` prefix: `.transport` itself lives in player.css) */
   .hero .transport { justify-content: center; gap: var(--gap-2); }
-  .chips { justify-content: center; }
 }
 
 @media (max-width: 980px) {
@@ -1099,8 +1098,7 @@ kbd {
 @media (pointer: coarse) {
   .icon-btn,
   .side-list__item,
-  .side-list__add,
-  .chips .chip {
+  .side-list__add {
     min-height: 44px;
   }
   .play-btn { min-width: 52px; min-height: 52px; }
@@ -1326,8 +1324,6 @@ kbd {
   letter-spacing: 0.1em;
   font-size: var(--t-micro);
 }
-
-.chips { display: flex; flex-wrap: wrap; gap: var(--gap-2); }
 
 /* live equaliser glyph */
 .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
@@ -3100,13 +3096,6 @@ mark { background: color-mix(in oklab, var(--accent-a) 34%, transparent); color:
               <svg width="20" height="20"><use href="#i-heart"/></svg>
             </button>
           </div>
-
-          <div class="chips" id="hero-chips" role="group" aria-label="Эквалайзер">
-            <button class="chip" data-eq="flat">Нейтральный</button>
-            <button class="chip is-active" data-eq="warm">Тёплый</button>
-            <button class="chip" data-eq="bright">Яркий</button>
-            <button class="chip" data-eq="air">Воздух</button>
-          </div>
         </div>
       </section>
 
@@ -3482,7 +3471,6 @@ const DEFAULTS = {
   muted: false,
   shuffle: false,
   repeat: 'all',
-  eq: 'warm',
   queue: [],
   /* library meta */
   likes: [],
@@ -3516,7 +3504,7 @@ function load() {
 /** Keys that survive a reload. */
 const PERSIST = [
   'order', 'filter', 'view', 'currentId', 'position', 'volume', 'muted',
-  'shuffle', 'repeat', 'eq', 'queue', 'likes', 'recently', 'rail', 'settings',
+  'shuffle', 'repeat', 'queue', 'likes', 'recently', 'rail', 'settings',
 ];
 
 class Store {
@@ -4362,6 +4350,12 @@ const { clamp: clamp } = __req("scripts/core/dom.js");
 const LOOKAHEAD = 0.6; // seconds of bars scheduled in advance
 const TICK_MS = 25;
 
+/**
+ * Пресеты эквалайзера. Интерфейсом больше не выбираются, но остаются в коде
+ * вместе с фильтрами в тракте: три полосы стоят там с нулевым усилением, то есть
+ * граф прозрачен, а вернуть настройку — одна строка. Сами значения приведены как
+ * были, чтобы можно было вернуть не гадая.
+ */
 const EQ_PRESETS = {
   flat: { low: 0, mid: 0, high: 0 },
   warm: { low: 3.4, mid: -1.6, high: -4.2 },
@@ -4567,7 +4561,13 @@ class AudioEngine {
     this.ctx = null;
     this.voice = null;      // primary voice
     this.voices = new Set();
-    this.eqName = 'warm';
+    /* Нейтрально, и это единственное значение, которое теперь вообще
+       используется. Раньше стоял «warm», то есть плеер тихо перекрашивал звук до
+       того, как кто-либо что-то нажал, а кнопки выбора стояли в герое четырьмя
+       словами без единого намёка, что это про звук. Замер показал, что и при
+       явном выборе разница не слышна: ±1.6…5 дБ на трёх широких полосах
+       пропадают в 96-килобитном эфире, который станция уже свела под себя. */
+    this.eqName = 'flat';
     this.volume = 0.72;
     this.muted = false;
     this.state = 'idle';    // idle | loading | playing | paused
@@ -6685,11 +6685,6 @@ class Player {
     return muted;
   }
 
-  setEq(name) {
-    store.set({ eq: name });
-    engine.setEq(name);
-  }
-
   setFilter(filter) {
     store.set({ filter, search: '' });
   }
@@ -8104,7 +8099,6 @@ const dom = {
   volume: $('volume'),
   mute: $('btn-mute'),
   playbar: $('playbar'),
-  chips: $('hero-chips'),
 };
 
 const RING_LEN = 292.2;
@@ -8388,21 +8382,6 @@ function initTransport() {
     e.preventDefault();
     player.setVolume(store.get('volume') - e.deltaY * 0.0016);
   }, { passive: false });
-
-  /* --- EQ chips --- */
-  dom.chips?.addEventListener('click', (e) => {
-    const chip = e.target.closest('[data-eq]');
-    if (!chip) return;
-    player.setEq(chip.dataset.eq);
-    for (const c of dom.chips.querySelectorAll('[data-eq]')) c.classList.toggle('is-active', c === chip);
-  });
-
-  /* --- initial paint --- */
-  const eq = store.get('eq');
-  for (const c of dom.chips?.querySelectorAll('[data-eq]') || []) {
-    c.classList.toggle('is-active', c.dataset.eq === eq);
-  }
-  engine.setEq(eq);
 
   /* --- clock --- */
   addTask(updateClock);
