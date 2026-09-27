@@ -53,6 +53,9 @@ console.log(`✓ синтаксис в порядке: ${jsFiles.length} мод�
 const textFiles = [
   ...jsFiles,
   ...['index.html', 'build.mjs'],
+  /* the Worker is not part of the bundle, but it is read by a person, so its
+     Russian comments get the same check as everything else */
+  ...readdirSync(p('worker')).filter((f) => f.endsWith('.js')).map((f) => p('worker', f)),
   ...readdirSync(p('styles')).filter((f) => f.endsWith('.css')).map((f) => p('styles', f)),
 ];
 

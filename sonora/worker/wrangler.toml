@@ -1,0 +1,26 @@
+# Конфигурация Worker'а. Публикуется отдельно от сайта:
+#
+#   npm i -g wrangler
+#   wrangler login
+#   wrangler deploy
+#
+# после чего Worker отвечает на https://<имя>.workers.dev/?id=... , и этот адрес
+# вписывается в ENDPOINT в scripts/data/online.js. Пока он не вписан, счётчик на
+# странице просто не показывается — см. там же.
+
+name = "sonora-online"
+main = "online.js"
+compatibility_date = "2025-06-01"
+
+# Один Durable Object на всех посетителей: он и держит множество живых сессий.
+# Ключ здесь именно такой, а не идентификатор посетителя — иначе у каждого
+# будет свой экземпляр, и каждый увидит ровно одного человека.
+[[durable_objects.bindings]]
+name = "SESSIONS"
+class_name = "Sessions"
+
+# Миграция на SQLite-хранилище Durable Object. Оно тут нужно самой платформе,
+# состояние мы в нём не держим.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Sessions"]

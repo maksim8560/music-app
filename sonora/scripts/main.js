@@ -15,6 +15,7 @@ import { initPalette, open as openPalette, paletteShortcut } from './ui/palette.
 import { initSettings, applyTheme, openSettingsSheet, openQueueSheet } from './ui/settings.js';
 import { initAdmin, openAdmin, isAdminOpen } from './ui/admin.js';
 import { initSync, startWatch } from './data/sync.js';
+import { initOnline } from './data/online.js';
 import { admin } from './data/admin.js';
 import { initShortcuts } from './ui/shortcuts.js';
 import { createVisualizers } from './ui/visualizer.js';
@@ -394,6 +395,11 @@ function boot() {
   flush();
   renderLibrary();
   renderQueue();
+  /* How many people are on the site at this moment. Started with the rest and
+     silent until the counter answers: it is the one thing here that genuinely
+     cannot be known without someone answering, so it waits rather than guesses.
+     No-op until ENDPOINT in data/online.js is filled in. */
+  initOnline(plural);
   /* The shared catalogue, if a repository is configured. Started after the
      first paint so a slow or unreachable GitHub never delays the page opening;
      when it lands, reconcile() puts the shelf in place. */
