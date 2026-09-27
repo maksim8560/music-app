@@ -51,8 +51,8 @@
     {
       "id": "url-1",
       "title": "Пиратская станция",
-      "artist": "Пиратская станция",
-      "album": "Pirate",
+      "artist": "Radio Record",
+      "album": "Radio Record",
       "year": 2026,
       "duration": 0,
       "colors": [
@@ -93,7 +93,7 @@
       ]
     }
   ],
-  "updatedAt": 1790502430114,
+  "updatedAt": 1790502519742,
   "genres": [
     {
       "key": "muzyka",
@@ -101,5 +101,5 @@
       "color": "#7ff221"
     }
   ],
-  "exportedAt": "2026-09-27T09:47:11.346Z"
+  "exportedAt": "2026-09-27T09:48:40.951Z"
 }
