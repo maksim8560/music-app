@@ -18,7 +18,7 @@ let stations = [
 app.post("/login", (req, res) => {
     const { user, pass } = req.body;
 
-    if (user === "Admin" && pass === "952378") {
+    if (user === "Admin" && pass === "FAKE HA HA HA") {
         const token = jwt.sign({ role: "admin" }, SECRET, { expiresIn: "2h" });
         return res.json({ token });
     }
