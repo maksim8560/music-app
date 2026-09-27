@@ -47,6 +47,22 @@
       "url": "https://radiorecord.hostingradio.ru/chil96.aacp",
       "source": "stream",
       "custom": true
+    },
+    {
+      "id": "url-1",
+      "title": "Пиратская станция",
+      "artist": "Пиратская станция",
+      "album": "Pirate",
+      "year": 2026,
+      "duration": 0,
+      "colors": [
+        "#2f8cff",
+        "#63f5d2"
+      ],
+      "blurb": "Бла бла бла",
+      "url": "https://radiorecord.hostingradio.ru/ps96.aacp",
+      "source": "url",
+      "custom": true
     }
   ],
   "playlists": [
@@ -59,6 +75,13 @@
       ]
     }
   ],
-  "updatedAt": 1790488585309,
-  "exportedAt": "2026-09-27T05:58:13.708Z"
+  "updatedAt": 1790490160720,
+  "genres": [
+    {
+      "key": "muzyka",
+      "label": "Музыка",
+      "color": "#7ff221"
+    }
+  ],
+  "exportedAt": "2026-09-27T06:22:41.924Z"
 }
