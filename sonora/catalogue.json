@@ -112,9 +112,15 @@
         "radio-3",
         "radio-4"
       ]
+    },
+    {
+      "id": "pl-2",
+      "name": "Радио",
+      "icon": "wave",
+      "trackIds": []
     }
   ],
-  "updatedAt": 1790502655524,
+  "updatedAt": 1790502662420,
   "genres": [
     {
       "key": "muzyka",
@@ -122,5 +128,5 @@
       "color": "#7ff221"
     }
   ],
-  "exportedAt": "2026-09-27T09:50:56.724Z"
+  "exportedAt": "2026-09-27T09:51:03.626Z"
 }
