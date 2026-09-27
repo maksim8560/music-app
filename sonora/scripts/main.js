@@ -352,6 +352,7 @@ function boot() {
   background.start(
     () => (store.get('playing') ? engine.level() : 0),
     () => (store.get('playing') ? engine.air() : 0),
+    () => store.get('playing'),
   );
 
   initTransport();

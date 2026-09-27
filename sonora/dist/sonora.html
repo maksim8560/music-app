@@ -8624,6 +8624,17 @@ class Background {
     this.floor = 0;
     this.air = 0;
     this.swell = 0;
+    /* Beats are a different animal again: a drum is a transient, not a level.
+       There was a detector here that found each onset and kicked the backdrop
+       on it, and it was wrong. Brightness pulsing on every hit is a strobe:
+       at eight hits in five seconds the whole screen throbbed, which reads as
+       an epileptic'srave rather than as light, and flashing that hard is a
+       genuine photosensitivity trigger rather than a matter of taste. So there
+       is no per-hit term any more - the reaction is the slow pulse and the
+       slower swell, and a beat reaches the eye as a breath, not as a flash. */
+    this.slow = 0;
+    /* 1 while nothing is playing: the backdrop goes grey and settles. */
+    this.quiet = 1;
     this.reactive = true;
     this.motion = true;
     this.t = 0;
@@ -8660,20 +8671,35 @@ class Background {
     this.paletteDirty = true;
   }
 
-  start(getLevel, getAir) {
+  start(getLevel, getAir, isPlaying) {
     this.getLevel = getLevel;
     this.getAir = getAir || null;
+    this.isPlaying = isPlaying || null;
+    /* the system setting, not our own: somebody who has asked the whole desktop
+       for less motion should not have to find a switch in this site as well */
+    const prefers = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (prefers) {
+      this.calm = prefers.matches;
+      prefers.addEventListener?.('change', (e) => { this.calm = e.matches; });
+    }
     addTask((dt) => this.#frame(dt));
   }
 
   #frame(dt) {
     if (document.hidden) return;
+    /* Someone who has asked their operating system for less motion gets a
+       backdrop that does not move with the music at all. It is the same reason
+       the beat detector is gone: a screen that pulses with the drums is a real
+       problem for people who are sensitive to it, and the setting is already
+       there, so honour it instead of making someone find a toggle. */
+    const still = this.motion === false || this.calm;
     /* colours are still easing towards the target — keep drawing until settled */
     const settling =
       this.paletteDirty ||
       this.colors.some((c, i) => Math.abs(c[0] - this.target[i][0]) > 0.5 || Math.abs(c[2] - this.target[i][2]) > 0.5) ||
       Math.abs(this.base[0] - this.baseTarget[0]) > 0.5;
     if (!this.motion && !settling) return; // static backdrop: no repaints at all
+    if (still && !settling) return;
 
     this.acc = (this.acc || 0) + dt;
     if (this.acc < FRAME) return; // cap the repaint rate
@@ -8696,24 +8722,27 @@ class Background {
       damp(this.base[2], this.baseTarget[2], 0.45, dt),
     ];
 
-    const level = this.reactive && this.getLevel ? this.getLevel() : 0;
-    const air = this.reactive && this.getAir ? this.getAir() : 0;
+    const playing = this.reactive && this.isPlaying ? this.isPlaying() : !this.reactive;
+    const level = !still && this.reactive && this.getLevel ? this.getLevel() : 0;
+    const air = !still && this.reactive && this.getAir ? this.getAir() : 0;
 
-    /* Two different rates on purpose. The floor follows the band's own average
-       slowly, so it is the record's loudness and not its movement; the pulse is
-       what sits above it. Rises fast enough to catch a beat, falls slower, so
-       the light lifts and then settles instead of flickering. */
+    /* The floor is the record's own average, followed slowly, so it is the
+       loudness rather than the movement. Everything the eye reacts to is what
+       stands above it. */
     this.floor = damp(this.floor, level, 0.25, dt);
-    this.air = damp(this.air, air, 1.6, dt);
+    this.slow = damp(this.slow, level, 1.1, dt);
+    this.air = damp(this.air, air, 1.0, dt);
 
-    const pulse = clamp01((level - this.floor) * 3.4) * 0.62 + this.air * 0.38;
-    /* Back to rest when nothing is playing, so the site settles instead of
-       holding the last glow forever. */
+    const pulse = clamp01((level - this.floor) * 3.2) * 0.55 + this.air * 0.45;
     const wanted = this.reactive ? pulse : 0;
-    this.energy = damp(this.energy, wanted, 1.4, dt);
-    /* a slow, wide swell for the big colour movement — separate from the pulse
-       so the backdrop drifts over a phrase rather than pulsing with each beat */
-    this.swell = damp(this.swell, wanted, 0.32, dt);
+    /* Slow enough that nothing on the page ever snaps. A backdrop that answers
+       a beat within a frame is a light show; this one takes a second or two to
+       open and the same again to close. */
+    this.energy = damp(this.energy, wanted, 0.85, dt);
+    this.swell = damp(this.swell, wanted, 0.3, dt);
+    /* and the colour drains away as the music does, so silence looks like
+       silence instead of like the track still playing quietly */
+    this.quiet = damp(this.quiet, playing && this.reactive ? 0 : 1, 0.5, dt);
 
     const { ctx, w, h } = this;
     ctx.globalCompositeOperation = 'source-over';
@@ -8721,9 +8750,12 @@ class Background {
     ctx.fillRect(0, 0, w, h);
 
     ctx.globalCompositeOperation = 'screen';
-    /* the pulse moves the blobs' size, the swell their colour: two rates, so
-       the backdrop never looks like one thing being turned up and down */
-    const boost = 1 + this.energy * 0.3;
+    /* Brighter than it was, and slower. Size follows the pulse and colour
+       follows the swell, both heavily damped, so the backdrop lifts and settles
+       over seconds. Nothing in here is allowed to move fast enough to read as a
+       flash. */
+    const boost = 1 + this.energy * 0.22;
+    const dim = 1 - this.quiet * 0.42;
 
     for (const b of this.blobs) {
       if (this.motion) b.step(dt, this.t);
@@ -8734,10 +8766,13 @@ class Background {
       /* 1.2°/s: one pass through the wheel takes five minutes, so the tint
          shifts under the eye instead of chasing it */
       const hueShift = hsl((this.t * 1.2 + b.hue * 360) % 360, 0.75, 0.6);
-      const col = mixRgb(t, hueShift, 0.12 + this.swell * 0.26);
+      let col = mixRgb(t, hueShift, 0.12 + this.swell * 0.3);
+      /* silence drains the colour toward grey rather than just dimming it, so
+         a paused site reads as still and a playing one as alive */
+      if (this.quiet > 0.002) col = mixRgb(col, greyOf(col), this.quiet * 0.82);
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-      g.addColorStop(0, rgba(col, 0.42 + this.energy * 0.24));
-      g.addColorStop(0.45, rgba(col, 0.14 + this.swell * 0.12));
+      g.addColorStop(0, rgba(col, (0.54 + this.energy * 0.3) * dim));
+      g.addColorStop(0.45, rgba(col, (0.2 + this.swell * 0.16) * dim));
       g.addColorStop(1, rgba(col, 0));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
@@ -8750,6 +8785,12 @@ class Background {
 
 const rgbCss = ([r, g, b]) => `rgb(${r | 0},${g | 0},${b | 0})`;
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/** the same colour with all its colour taken out — what silence looks like */
+const greyOf = ([r, g, b]) => {
+  const y = r * 0.299 + g * 0.587 + b * 0.114;
+  return [y, y, y];
+};
 
 const background = new Background(document.getElementById('bg-canvas'));
 
@@ -10609,6 +10650,7 @@ function boot() {
   background.start(
     () => (store.get('playing') ? engine.level() : 0),
     () => (store.get('playing') ? engine.air() : 0),
+    () => store.get('playing'),
   );
 
   initTransport();
