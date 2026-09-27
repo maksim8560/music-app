@@ -61,9 +61,26 @@
       ],
       "blurb": "Бла бла бла",
       "url": "https://radiorecord.hostingradio.ru/ps96.aacp",
-      "source": "url",
+      "source": "stream",
       "custom": true,
       "coverUrl": "https://avatars.mds.yandex.net/i?id=ab8f459a44db2f11fd156bbfb3e49456_sr-6951086-images-thumbs&n=13"
+    },
+    {
+      "id": "radio-3",
+      "title": "Lo-Fi",
+      "artist": "Radio Record",
+      "album": "Lo-Fi",
+      "year": 2026,
+      "duration": 0,
+      "colors": [
+        "#ff7a6b",
+        "#ffc46b"
+      ],
+      "blurb": "",
+      "coverUrl": "https://i.pinimg.com/736x/72/05/47/720547b05d541d47bab8483b33cfa744.jpg",
+      "url": "https://radiorecord.hostingradio.ru/lofi96.aacp",
+      "source": "stream",
+      "custom": true
     }
   ],
   "playlists": [
@@ -76,7 +93,7 @@
       ]
     }
   ],
-  "updatedAt": 1790491031397,
+  "updatedAt": 1790502430114,
   "genres": [
     {
       "key": "muzyka",
@@ -84,5 +101,5 @@
       "color": "#7ff221"
     }
   ],
-  "exportedAt": "2026-09-27T06:37:15.557Z"
+  "exportedAt": "2026-09-27T09:47:11.346Z"
 }
