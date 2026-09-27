@@ -102,9 +102,9 @@
   ],
   "playlists": [
     {
-      "id": "pl-1",
-      "name": "Музыка для души",
-      "icon": "note",
+      "id": "pl-2",
+      "name": "Радио",
+      "icon": "wave",
       "trackIds": [
         "radio-1",
         "radio-2",
@@ -112,15 +112,9 @@
         "radio-3",
         "radio-4"
       ]
-    },
-    {
-      "id": "pl-2",
-      "name": "Радио",
-      "icon": "wave",
-      "trackIds": []
     }
   ],
-  "updatedAt": 1790502662420,
+  "updatedAt": 1790502680988,
   "genres": [
     {
       "key": "muzyka",
@@ -128,5 +122,5 @@
       "color": "#7ff221"
     }
   ],
-  "exportedAt": "2026-09-27T09:51:03.626Z"
+  "exportedAt": "2026-09-27T09:51:22.190Z"
 }
