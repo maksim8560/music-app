@@ -81,6 +81,23 @@
       "url": "https://radiorecord.hostingradio.ru/lofi96.aacp",
       "source": "stream",
       "custom": true
+    },
+    {
+      "id": "radio-4",
+      "title": "Trap",
+      "artist": "Radio Record",
+      "album": "Radio Record",
+      "year": 2026,
+      "duration": 0,
+      "colors": [
+        "#ff7a6b",
+        "#ffc46b"
+      ],
+      "blurb": "",
+      "coverUrl": "https://images.tuneyou.com/images/logos/500_500/57/3157/DFMTrap.png",
+      "url": "https://radiorecord.hostingradio.ru/trap96.aacp",
+      "source": "stream",
+      "custom": true
     }
   ],
   "playlists": [
@@ -93,7 +110,7 @@
       ]
     }
   ],
-  "updatedAt": 1790502521471,
+  "updatedAt": 1790502618476,
   "genres": [
     {
       "key": "muzyka",
@@ -101,5 +118,5 @@
       "color": "#7ff221"
     }
   ],
-  "exportedAt": "2026-09-27T09:48:42.688Z"
+  "exportedAt": "2026-09-27T09:50:19.679Z"
 }
