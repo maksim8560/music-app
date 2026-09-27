@@ -29,39 +29,21 @@ const TIMEOUT_MS = 4000;
 /** после стольких минут молчания число перестаёт быть правдой и прячется */
 const STALE_MS = 5 * 60_000;
 
-const KEY = 'sonora.session';
-const ID_RE = /^[a-zA-Z0-9-]{1,64}$/;
-
 /**
- * Идентификатор сессии — вкладки, а не человека.
+ * Один запрос — и всё.
  *
- * sessionStorage, а не случайное число на каждую загрузку: перезагрузка
- * страницы не должна превращать одного человека в двух, иначе счётчик растёт
- * от каждого F5. Вторая вкладка — уже другой ключ, и это честно: она и правда
- * ещё одна сессия.
+ * Никакого идентификатора: Worker сам берёт адрес из заголовка
+ * CF-Connecting-IP и считает по нему. Вкладок может быть сколько угодно, а
+ * человек засчитывается один, и в браузере не остаётся вообще ничего — ни
+ * ключа в sessionStorage, ни идентификатора, который пришлось бы хранить.
  */
-function sessionId() {
-  try {
-    let id = sessionStorage.getItem(KEY);
-    if (!id) {
-      id = crypto.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-      sessionStorage.setItem(KEY, id);
-    }
-    return id;
-  } catch {
-    /* приватный режим или отключённое хранилище: идентификатор не переживёт
-       перезагрузку, но переживёт текущую страницу — для счётчика хватит */
-    return crypto.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  }
-}
-
-async function ping(id) {
+async function ping() {
   const ctrl = new AbortController();
   /* прерываем самому: иначе зависший ответ держит соединение до сетевого
      таймаута браузера, который бывает и две минуты */
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${ENDPOINT}?id=${encodeURIComponent(id)}`, {
+    const res = await fetch(ENDPOINT, {
       signal: ctrl.signal,
       cache: 'no-store',
       headers: { Accept: 'application/json' },
@@ -77,7 +59,7 @@ async function ping(id) {
 }
 
 /**
- * Показать, сколько сессий на сайте.
+ * Показать, сколько людей сейчас на сайте.
  *
  * Число появляется только после первого ответа сервера и исчезает, если ответы
  * прекратились надолго. Короткий перебой не стирает его: мигающая надпись
@@ -95,23 +77,26 @@ export function initOnline(plural) {
   const text = document.getElementById('online-text');
   if (!row || !text) return;
 
-  const id = sessionId();
-  /* сервер отвергает всё, что не похоже на идентификатор, но и мусор ему
-     слать незачем */
-  if (!ID_RE.test(id)) return;
-
   let timer = 0;
   let lastOk = 0;
 
   const show = (n) => {
     text.textContent = plural(n, 'человек', 'человека', 'человек');
-    row.title = `Сейчас на сайте: ${n}. Обновляется каждые ${PING_MS / 1000} секунд.`;
+    /* Подсказка объясняет, что именно считается. Считаем по адресу, а не по
+       вкладкам, и у этого есть честная обратная сторона: за одним адресом
+       может сидеть много разных людей. Сказать об этом надо в подписи, а не
+       прятать - иначе человек увидит «1 человек» рядом с битком на Wi-Fi в
+       кафе и решит, что счётчик сломан. */
+    row.title =
+      `Сейчас на сайте: ${n}. Обновляется каждые ${PING_MS / 1000} секунд.\n`
+      + 'Считаются разные адреса, а не вкладки, так что все ваши вкладки — это один человек. '
+      + 'Но если вы за одним адресом с кем-то ещё (мобильная сеть, общественный Wi-Fi), вы посчитаетесь вместе.';
     row.hidden = false;
   };
 
   const tick = async () => {
     try {
-      const n = await ping(id);
+      const n = await ping();
       lastOk = Date.now();
       show(n);
     } catch {
