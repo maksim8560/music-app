@@ -106,11 +106,15 @@
       "name": "Музыка для души",
       "icon": "note",
       "trackIds": [
-        "radio-1"
+        "radio-1",
+        "radio-2",
+        "url-1",
+        "radio-3",
+        "radio-4"
       ]
     }
   ],
-  "updatedAt": 1790502618476,
+  "updatedAt": 1790502655524,
   "genres": [
     {
       "key": "muzyka",
@@ -118,5 +122,5 @@
       "color": "#7ff221"
     }
   ],
-  "exportedAt": "2026-09-27T09:50:19.679Z"
+  "exportedAt": "2026-09-27T09:50:56.724Z"
 }
