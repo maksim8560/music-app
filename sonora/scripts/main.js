@@ -60,8 +60,18 @@ function flush() {
 
   const has = (...list) => list.some((k) => keys.has(k));
 
-  if (has('currentId', 'order', 'filter', 'search', 'view', 'likes', 'playing')) {
+  /* Starting a track used to rebuild the whole list. It does not have to: which
+     track is current, whether it is playing and what is liked are all things a
+     row can be told in place, and `syncLibrary` does exactly that. Rebuilding
+     meant every row was destroyed and recreated on each press, which threw away
+     hover, focus and the row animations - the list visibly flinched when the
+     music started, and the buttons on the row under the cursor flickered. Only
+     a change to which rows exist, or to their order, needs the real thing. */
+  if (has('order', 'filter', 'search', 'view')) {
     renderLibrary();
+  }
+  if (has('currentId', 'playing', 'likes')) {
+    syncLibrary();
   }
   if (has('queue', 'currentId', 'repeat', 'shuffle', 'order')) {
     renderQueue();

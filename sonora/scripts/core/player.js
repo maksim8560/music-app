@@ -14,6 +14,9 @@ import { toast } from '../ui/toast.js';
 
 const LOCAL_PREFIX = 'local:';
 
+/** Two id lists holding the same things in the same order, whatever they are */
+const sameIds = (a, b) => Array.isArray(a) && a.length === b.length && a.every((x, i) => x === b[i]);
+
 class Player {
   #local = [];
   #shuffleBag = [];
@@ -88,12 +91,20 @@ class Player {
     const order = (store.get('order') || []).filter((id) => valid.has(id));
     for (const t of all) if (!order.includes(t.id)) order.push(t.id);
     const currentId = valid.has(store.get('currentId')) ? store.get('currentId') : order[0] || null;
-    store.set({
-      order,
-      queue: (store.get('queue') || []).filter((id) => valid.has(id)),
-      likes: (store.get('likes') || []).filter((id) => valid.has(id)),
-      currentId,
-    });
+
+    /* Every one of these `.filter` calls hands back a new array even when it
+       holds exactly what it held before, and the store cannot tell the
+       difference - so a reconcile that found nothing to fix still looked like
+       a change and rebuilt the shelf. This runs on every start of playback and
+       on every catalogue sync, which is why the list used to flinch when the
+       music started. Only what genuinely differs is written. */
+    const patch = {};
+    const same = (key, next) => (sameIds(store.get(key), next) ? null : (patch[key] = next));
+    same('order', order);
+    same('queue', (store.get('queue') || []).filter((id) => valid.has(id)));
+    same('likes', (store.get('likes') || []).filter((id) => valid.has(id)));
+    if (store.get('currentId') !== currentId) patch.currentId = currentId;
+    if (Object.keys(patch).length) store.set(patch);
   }
 
   /* ----------------------------- queries ------------------------------- */

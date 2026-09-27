@@ -6142,6 +6142,9 @@ const { toast: toast } = __req("scripts/ui/toast.js");
 
 const LOCAL_PREFIX = 'local:';
 
+/** Two id lists holding the same things in the same order, whatever they are */
+const sameIds = (a, b) => Array.isArray(a) && a.length === b.length && a.every((x, i) => x === b[i]);
+
 class Player {
   #local = [];
   #shuffleBag = [];
@@ -6216,12 +6219,20 @@ class Player {
     const order = (store.get('order') || []).filter((id) => valid.has(id));
     for (const t of all) if (!order.includes(t.id)) order.push(t.id);
     const currentId = valid.has(store.get('currentId')) ? store.get('currentId') : order[0] || null;
-    store.set({
-      order,
-      queue: (store.get('queue') || []).filter((id) => valid.has(id)),
-      likes: (store.get('likes') || []).filter((id) => valid.has(id)),
-      currentId,
-    });
+
+    /* Every one of these `.filter` calls hands back a new array even when it
+       holds exactly what it held before, and the store cannot tell the
+       difference - so a reconcile that found nothing to fix still looked like
+       a change and rebuilt the shelf. This runs on every start of playback and
+       on every catalogue sync, which is why the list used to flinch when the
+       music started. Only what genuinely differs is written. */
+    const patch = {};
+    const same = (key, next) => (sameIds(store.get(key), next) ? null : (patch[key] = next));
+    same('order', order);
+    same('queue', (store.get('queue') || []).filter((id) => valid.has(id)));
+    same('likes', (store.get('likes') || []).filter((id) => valid.has(id)));
+    if (store.get('currentId') !== currentId) patch.currentId = currentId;
+    if (Object.keys(patch).length) store.set(patch);
   }
 
   /* ----------------------------- queries ------------------------------- */
@@ -10358,8 +10369,18 @@ function flush() {
 
   const has = (...list) => list.some((k) => keys.has(k));
 
-  if (has('currentId', 'order', 'filter', 'search', 'view', 'likes', 'playing')) {
+  /* Starting a track used to rebuild the whole list. It does not have to: which
+     track is current, whether it is playing and what is liked are all things a
+     row can be told in place, and `syncLibrary` does exactly that. Rebuilding
+     meant every row was destroyed and recreated on each press, which threw away
+     hover, focus and the row animations - the list visibly flinched when the
+     music started, and the buttons on the row under the cursor flickered. Only
+     a change to which rows exist, or to their order, needs the real thing. */
+  if (has('order', 'filter', 'search', 'view')) {
     renderLibrary();
+  }
+  if (has('currentId', 'playing', 'likes')) {
+    syncLibrary();
   }
   if (has('queue', 'currentId', 'repeat', 'shuffle', 'order')) {
     renderQueue();
