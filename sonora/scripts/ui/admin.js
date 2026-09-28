@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { on, qs, qsa, plural } from '../core/dom.js';
+import { probeLink } from './linkprobe.js';
 import { store } from '../core/store.js';
 import { player } from '../core/player.js';
 import { admin, PLAYLIST_ICONS } from '../data/admin.js';
@@ -417,20 +418,74 @@ function addUrlForm() {
   };
   applyKind('file');
 
+  /* --- проверка ссылки ------------------------------------------------- */
+  /* Ссылку не нужно угадывать: что по ней отдаётся, выясняется один раз запросом
+     и показывается словами. Поля заполняются только пустые — вписанное руками
+     не затираем, потому что человек знает про свой трек больше, чем заголовки. */
+  const status = el('p', { class: 'adm-probe', role: 'status' });
+  const urlInput = input(draft.url, (v) => { draft.url = v; schedule(); }, { placeholder: 'https://example.com/track.mp3' });
+  const kindSelect = select('file', [
+    ['file', 'Аудиофайл — mp3, flac, wav, ogg, m4a'],
+    ['stream', 'Радио — прямой эфир, поток не кончается'],
+  ], applyKind);
+  const titleInput = input(draft.title, (v) => { draft.title = v; }, { maxlength: '60' });
+  const artistInput = input(draft.artist, (v) => { draft.artist = v; }, { maxlength: '60' });
+  const albumInput = input(draft.album, (v) => { draft.album = v; }, { maxlength: '60' });
+
+  let timer = 0;
+  let token = 0;
+
+  const say = (text, kind) => {
+    status.textContent = text;
+    status.dataset.state = kind;
+  };
+
+  const schedule = () => {
+    clearTimeout(timer);
+    const value = draft.url.trim();
+    if (!value) {
+      say('Вставьте адрес — и я проверю, что по нему отдаётся.', 'idle');
+      return;
+    }
+    say('Проверяю…', 'busy');
+    /* ждём, пока человек допечатает, и отменяем проверку предыдущего адреса,
+       если он успел уйти в сеть раньше, чем пришёл новый */
+    const mine = ++token;
+    timer = setTimeout(async () => {
+      const found = await probeLink(draft.url);
+      if (mine !== token) return;
+
+      if (!found.ok) {
+        say(found.note, 'bad');
+        return;
+      }
+      say(found.note, 'good');
+      if (kindSelect.value !== found.kind) applyKind(found.kind);
+
+      const t = found.tags;
+      if (!t) return;
+      for (const [key, node] of [['title', titleInput], ['artist', artistInput], ['album', albumInput]]) {
+        if (t[key] && !node.value.trim()) {
+          node.value = t[key].slice(0, 60);
+          draft[key] = node.value;
+        }
+      }
+    }, 500);
+  };
+  schedule();
+
   return el('div', { class: 'adm-add' }, [
     el('h3', { text: 'Трек по прямой ссылке' }),
     el('div', { class: 'adm-grid adm-grid--one' }, [
-      field('Что это', select('file', [
-        ['file', 'Аудиофайл — mp3, flac, wav, ogg, m4a'],
-        ['stream', 'Радио — прямой эфир, поток не кончается'],
-      ], applyKind), 'Радио играет с любого домена. Файл должен отдаваться с CORS.'),
-      field('Ссылка', input(draft.url, (v) => { draft.url = v; }, { placeholder: 'https://example.com/track.mp3' })),
+      field('Что это', kindSelect, 'Определяется по ссылке само, но выбор можно поправить руками.'),
+      field('Ссылка', urlInput),
     ]),
+    status,
     hint,
     el('div', { class: 'adm-grid adm-grid--tight' }, [
-      field('Название', input(draft.title, (v) => { draft.title = v; }, { maxlength: '60' })),
-      field('Исполнитель', input(draft.artist, (v) => { draft.artist = v; }, { maxlength: '60' })),
-      field('Альбом', input(draft.album, (v) => { draft.album = v; }, { maxlength: '60' })),
+      field('Название', titleInput),
+      field('Исполнитель', artistInput),
+      field('Альбом', albumInput),
     ]),
     el('div', { class: 'adm-grid adm-grid--split' }, [
       field('Описание', el('textarea', {

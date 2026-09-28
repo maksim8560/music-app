@@ -235,6 +235,38 @@
   opacity: 0.8;
 }
 
+/* --------------------------------- probe -------------------------------- */
+/* Что отдаётся по вписанной ссылке. Цвет здесь несёт смысл, а не украшает:
+   зелёный — можно добавлять, красный — не заработает, и объяснение почему
+   стоит рядом, а не по наведению. */
+.adm-probe {
+  display: flex;
+  gap: 7px;
+  font-size: var(--t-small);
+  line-height: 1.5;
+  min-height: 1em;
+  margin: 0;
+}
+
+.adm-probe::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: 0.55em;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.65;
+}
+
+.adm-probe[data-state="idle"] { color: var(--text-3); opacity: 0.8; }
+.adm-probe[data-state="busy"] { color: var(--text-3); }
+.adm-probe[data-state="good"] { color: #4fbf7f; }
+.adm-probe[data-state="bad"] { color: var(--danger, #ff6b6b); }
+
+/* светлая тема: тот же смысл, но цвета, читающиеся на белом */
+[data-theme="light"] .adm-probe[data-state="good"] { color: #1f8a52; }
+
 /* ------------------------------- toolbar -------------------------------- */
 .adm-toolbar {
   display: flex;
