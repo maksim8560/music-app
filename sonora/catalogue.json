@@ -149,6 +149,22 @@
       "url": "https://dorognoe.hostingradio.ru:8000/dorognoe",
       "source": "stream",
       "custom": true
+    },
+    {
+      "id": "url-2",
+      "title": "152336756",
+      "artist": "По ссылке",
+      "album": "Ссылки",
+      "year": 2026,
+      "duration": 0,
+      "colors": [
+        "#2f8cff",
+        "#63f5d2"
+      ],
+      "blurb": "",
+      "url": "https://music.yandex.ru/album/42500171/track/152336756?utm_source=web&utm_medium=copy_link",
+      "source": "url",
+      "custom": true
     }
   ],
   "playlists": [
@@ -173,6 +189,6 @@
       "trackIds": []
     }
   ],
-  "updatedAt": 1790580113093,
-  "exportedAt": "2026-09-28T07:21:54.296Z"
+  "updatedAt": 1790580410223,
+  "exportedAt": "2026-09-28T07:26:51.427Z"
 }
