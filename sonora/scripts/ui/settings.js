@@ -12,10 +12,15 @@ import { background } from './background.js';
 
 const settingsSheet = document.getElementById('settings-sheet');
 const queueSheet = document.getElementById('queue-sheet');
+const reactiveSheet = document.getElementById('reactive-sheet');
+const reactiveConfirm = document.getElementById('reactive-confirm');
 const themeMeta = document.querySelector('meta[name="theme-color"]');
 
 export const openSettingsSheet = () => openSheet(settingsSheet);
 export const openQueueSheet = () => openSheet(queueSheet);
+
+/** Открыть предупреждение. Возвращать фокус умеет initSheet сам. */
+const openReactiveWarn = () => openSheet(reactiveSheet);
 
 /* ------------------------------- theming -------------------------------- */
 export function applyTheme() {
@@ -23,12 +28,22 @@ export function applyTheme() {
   const root = document.documentElement;
   root.dataset.theme = theme;
   root.dataset.accent = accent;
-  root.dataset.motion = motion ? 'on' : 'off';
+  /* `motion` значит «снижение движения», как и написано на переключателе, —
+     поэтому здесь наоборот: `off` у атрибута это как раз движение урезано.
+     Раньше выходило наоборот, и тумблер врал: при значении по умолчанию фон
+     стоял с урезанным движением, а переключатель показывал «выключено». */
+  root.dataset.motion = motion ? 'off' : 'on';
 
   const base = theme === 'dark' ? '#06060a' : '#e8eaf2';
   themeMeta?.setAttribute('content', base);
   background.setThemeBase(base);
   background.reactive = reactive;
+
+  /* «Снижение движения» останавливает всё, включая реакцию на звук. Обратная
+     сторона правки с атрибутом выше: пока движение не урезано, фон вправе
+     двигаться — иначе переключатель обещает то, чего не делает, а предупреждение
+     о светочувствительности советует средство, которое не работает. */
+  background.motion = !motion;
 
   const btn = document.getElementById('btn-theme');
   btn.querySelector('use')?.setAttribute('href', theme === 'dark' ? '#i-moon' : '#i-sun');
@@ -107,9 +122,29 @@ export function initSettings(hooks = {}) {
 
   on(reactive, 'click', () => {
     const next = !store.get('settings').reactive;
+    /* Выключить можно сразу и без вопросов — это всегда безопасное действие.
+       Включение проходит через предупреждение: реакция фона означает, что
+       экран меняет яркость в такт музыке, а для человека со светочувствительной
+       эпилепсией это противопоказанный стимул. Знать об этом следует до того,
+       как экран замигает, а не после. */
+    if (next) {
+      openReactiveWarn();
+      return;
+    }
     store.patchSettings({ reactive: next });
     reactive.setAttribute('aria-checked', String(next));
     applyTheme();
+  });
+
+  /* --- предупреждение о светочувствительности --- */
+  initSheet(reactiveSheet);
+  on(reactiveConfirm, 'click', () => {
+    /* `reactiveAck` — вместе с самим включением: перенос в store.js отличает по
+       нему осознанный выбор от прежнего умолчания, и больше не трогает его */
+    store.patchSettings({ reactive: true, reactiveAck: true });
+    reactive.setAttribute('aria-checked', 'true');
+    applyTheme();
+    closeSheet(reactiveSheet);
   });
 
   on(accents, 'click', (e) => {

@@ -11,6 +11,9 @@ import { toast } from './toast.js';
 
 const settingsSheet = document.getElementById('settings-sheet');
 const queueSheet = document.getElementById('queue-sheet');
+/* Панель предупреждения о светочувствительности: открывается поверх настроек,
+   поэтому и закрываться должна первой. */
+const reactiveSheet = document.getElementById('reactive-sheet');
 
 const isTyping = (el) =>
   el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
@@ -110,6 +113,13 @@ export function initShortcuts() {
         toast('Space — пауза · ←/→ — перемотка · K/L — треки · ⌘K — поиск · S — shuffle', 'info', 6000);
         break;
       case 'Escape':
+        /* Предупреждение закрываем первым: оно открывается поверх панели
+           настроек, и если не учесть этого, Escape закрывал бы нижнюю панель,
+           а диалог остался бы висеть без видимого выхода. */
+        if (!reactiveSheet.hidden) {
+          closeSheet(reactiveSheet);
+          break;
+        }
         if (!settingsSheet.hidden) closeSheet(settingsSheet);
         if (!queueSheet.hidden) closeSheet(queueSheet);
         /* an open sheet (including the admin panel) already handles Escape —

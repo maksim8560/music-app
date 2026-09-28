@@ -668,6 +668,32 @@
 
 .sheet__panel--settings { width: min(480px, 100%); gap: var(--gap-3); overflow-y: auto; }
 
+/* ---------------------------- photosensitivity --------------------------- */
+/* Панель предупреждения. Читать её нужно вдумчиво и целиком, поэтому текст
+   просторный, а кнопки отнесены вниз и разведены: «оставить выключенным»
+   должен быть на глаз раньше, чем согласие. */
+.sheet__panel--warn { width: min(460px, 100%); gap: var(--gap-3); }
+
+.warn-text {
+  margin: 0;
+  font-size: var(--t-small);
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.warn-text b { color: var(--text); }
+
+.warn-actions {
+  display: flex;
+  gap: var(--gap-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: var(--gap-1);
+}
+
+.warn-actions .ghost-btn { flex: 1 1 auto; }
+.warn-actions .primary-btn { flex: 1 1 auto; }
+
 @keyframes sheet-in {
   from { opacity: 0; transform: translateY(18px) scale(0.97); }
   to   { opacity: 1; transform: none; }

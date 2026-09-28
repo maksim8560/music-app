@@ -332,16 +332,50 @@
       </div>
     </div>
     <div class="setting setting--row">
-      <div class="setting__label"><b>Снижение движения</b><span>убирает параллакс и анимации фона</span></div>
+      <div class="setting__label"><b>Снижение движения</b><span>останавливает фон целиком, включая реакцию на звук</span></div>
       <button class="switch" id="set-motion" role="switch" aria-checked="false"><i></i></button>
     </div>
     <div class="setting setting--row">
       <div class="setting__label"><b>Реактивный фон</b><span>подсветка реагирует на звук</span></div>
-      <button class="switch" id="set-reactive" role="switch" aria-checked="true"><i></i></button>
+      <button class="switch" id="set-reactive" role="switch" aria-checked="false"><i></i></button>
     </div>
     <div class="setting setting--row">
       <div class="setting__label"><b>Сбросить прогресс</b><span>очередь, избранное, настройки</span></div>
       <button class="ghost-btn ghost-btn--danger" id="set-reset">Сбросить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Предупреждение о светочувствительности. Спрашиваем перед включением
+     реактивного фона, а не после: человек должен знать о риске до того, как
+     экран начнёт мигать, а не когда уже увидит. -->
+<div class="sheet" id="reactive-sheet" hidden>
+  <div class="sheet__backdrop" data-close></div>
+  <div class="sheet__panel sheet__panel--warn glass" role="alertdialog" aria-modal="true" aria-labelledby="reactive-title" aria-describedby="reactive-text">
+    <div class="sheet__head">
+      <h2 id="reactive-title">Включить реактивный фон?</h2>
+      <button class="icon-btn icon-btn--sm" data-close aria-label="Закрыть">
+        <svg width="18" height="18"><use href="#i-close"/></svg>
+      </button>
+    </div>
+    <p class="warn-text" id="reactive-text">
+      Подсветка начнёт дышать вместе с музыкой. Это не украшение: экран заметно
+      меняет яркость в такт ударным.
+    </p>
+    <p class="warn-text">
+      <b>Если у вас светочувствительная эпилепсия — не включайте.</b> Таким
+      людям такое движение противопоказано, и последствия могут проявиться не
+      сразу. Никакая плавность анимации не делает её безопасной: мы специально
+      убрали строчный эффект, но остающееся движение — то же самое движение.
+    </p>
+    <p class="warn-text">
+      Если сомневаетесь, оставьте как есть — фон останется красивым и тихим.
+      Реакцию также полностью останавливает переключатель «Снижение движения»,
+      и если ваша система просит уменьшить анимацию, сайт это уже учитывает сам.
+    </p>
+    <div class="sheet__head-tools warn-actions">
+      <button class="ghost-btn" data-close>Оставить выключенным</button>
+      <button class="primary-btn" id="reactive-confirm">Я понял, включить</button>
     </div>
   </div>
 </div>
