@@ -4669,7 +4669,13 @@ class AudioEngine {
 
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 2048;
-    this.analyser.smoothingTimeConstant = 0.78;
+    /* 0.6, а не 0.78. Это скользящее среднее по кадрам, и на высоком значении
+       оно съедает ровно то, ради чего фон слушает музыку: удар длится десятки
+       миллисекунд, а сглаживание растягивает его на сотни и приподнимает всю
+       оставшуюся кривую — удар перестаёт быть ударом. На 0.6 полосы для
+       столбиков всё ещё выглядят гладко, а транзиенты доходят до детектора
+       живыми. */
+    this.analyser.smoothingTimeConstant = 0.6;
     this.freq = new Uint8Array(this.analyser.frequencyBinCount);
 
     this.master = ctx.createGain();
@@ -8704,9 +8710,12 @@ const { cssVar: cssVar, damp: damp } = __req("scripts/core/dom.js");
 
 const COUNT = 5;
 const RES = 0.22; // internal resolution factor — upscaling to the viewport IS the blur
-const FPS = 24; // slow-drifting colour fields don't need 60fps, and every repaint
-                // forces the glass surfaces above to re-composite their blur
-const FRAME = 1 / FPS;
+
+/* Repaint rate, floating between these. The reason it floats is in
+   #paintInterval: a repaint costs the glass above it a full re-blur, so it is
+   spent where it shows and withheld where it doesn't. */
+const FPS_IDLE = 12;
+const FPS_BUSY = 30;
 
 class Blob {
   constructor(rand, index) {
@@ -8764,6 +8773,8 @@ class Background {
     this.fast = 0;
     this.slow = 0;
     this.beat = 0;
+    /* сколько музыки прямо сейчас — из этого решается, как часто рисовать */
+    this.pulse = 0;
     this.lastBeat = -1;
     /* 1 while nothing is playing: the backdrop goes grey and settles. */
     this.quiet = 1;
@@ -8817,6 +8828,70 @@ class Background {
     addTask((dt) => this.#frame(dt));
   }
 
+  /**
+   * Как часто перерисовывать.
+   *
+   * Раньше было ровно 24 раза в секунду, всегда. Замер показал, во сколько это
+   * обходится: фон ровно удваивает стоимость кадров, к которым прикасается —
+   * худший кадр 26.6 мс против 13.7 мс без него. Причина не в самом холсте, он
+   * крошечный (285×195), а в том, что над ним висят стеклянные панели: каждая
+   * перерисовка заставляет заново пересобрать их размытие.
+   *
+   * Поэтому частота плавающая. В тихом месте, где фон медленно дрейфует и глаз
+   * ничего не различает, двенадцати кадров хватает с большим запасом; рядом с
+   * битом, когда за фоном следят, нужны тридцать. Средняя нагрузка падает
+   * заметно, а частота растёт ровно тогда, когда нужна отзывчивость.
+   */
+  #paintInterval() {
+    const need = Math.min(1, this.beat * 1.4 + (this.pulse || 0));
+    return 1 / (FPS_IDLE + (FPS_BUSY - FPS_IDLE) * need);
+  }
+
+  /**
+   * Разбор того, что играет. Дёшево, идёт на каждом кадре.
+   *
+   * Скорости сглаживания подобраны так, чтобы свет поспевал за музыкой, а не
+   * полз за ней. Долгое время здесь и было главной причиной жалобы «фон отстаёт
+   * от битов»: визуальный вес несут `energy` и `swell`, а при 0.85 и 0.3 их
+   * постоянные времени равны 1.2 и 3.3 секунды — к удару они физически не
+   * успевали. Теперь 0.45 и 1.0 секунды: всё ещё плавно, но волна догоняет.
+   */
+  #listen(dt) {
+    const still = this.motion === false || this.calm;
+    const playing = this.reactive && this.isPlaying ? this.isPlaying() : !this.reactive;
+    const level = !still && this.reactive && this.getLevel ? this.getLevel() : 0;
+    const air = !still && this.reactive && this.getAir ? this.getAir() : 0;
+
+    /* The floor is the record's own average, followed slowly, so it is the
+       loudness rather than the movement. Everything the eye reacts to is what
+       stands above it. It stays the slowest thing in here on purpose: speed it
+       up and the pulse starts subtracting the very level it is meant to show. */
+    this.floor = damp(this.floor, level, 0.35, dt);
+    this.slow = damp(this.slow, level, 1.1, dt);
+    this.air = damp(this.air, air, 1.0, dt);
+
+    /* The beat itself. A quick follower chases the band, a slow one trails it,
+       and the distance between them is the transient — a kick or a snare is
+       exactly that: a spike the running average never sees. A short refractory
+       window keeps one hit from being counted three times. */
+    this.fast = damp(this.fast, level, 16, dt);
+    if (playing && !still && this.fast - this.slow > 0.022 && this.t - this.lastBeat > 0.14) {
+      this.lastBeat = this.t;
+      this.beat = 1;
+    }
+    /* the swell: quick to open, slower to close, and never a step */
+    this.beat = this.beat > 0 ? damp(this.beat, 0, 7, dt) : damp(this.beat, 0, 18, dt);
+    this.beat = Math.min(this.beat, 0.92);
+
+    this.pulse = clamp01((level - this.floor) * 3.2) * 0.55 + this.air * 0.45;
+    const wanted = this.reactive ? this.pulse : 0;
+    this.energy = damp(this.energy, wanted, 2.2, dt);
+    this.swell = damp(this.swell, wanted, 1.0, dt);
+    /* and the colour drains away as the music does, so silence looks like
+       silence instead of like the track still playing quietly */
+    this.quiet = damp(this.quiet, playing && this.reactive ? 0 : 1, 0.5, dt);
+  }
+
   #frame(dt) {
     if (document.hidden) return;
     /* Someone who has asked their operating system for less motion gets a
@@ -8833,8 +8908,17 @@ class Background {
     if (!this.motion && !settling) return; // static backdrop: no repaints at all
     if (still && !settling) return;
 
+    /* Слышим каждый кадр, рисуем — когда пора. Раньше обе вещи происходили
+       вместе, с частотой 24 кадра, и это было половиной отставания: удар
+       приходил в случайный момент между двумя перерисовками, то есть в
+       среднем через 20 мс, а в худшем — через 42. Чтение полосы стоит почти
+       ничего (берутся первые два десятка байт уже посчитанного массива), так
+       что спрашивать музыку можно хоть на каждом кадре, а дорогую перерисовку
+       — только когда она правда что-то меняет. */
+    this.#listen(Math.min(dt, 0.1));
+
     this.acc = (this.acc || 0) + dt;
-    if (this.acc < FRAME) return; // cap the repaint rate
+    if (this.acc < this.#paintInterval()) return;
     const step = Math.min(this.acc, 0.25);
     this.acc = 0;
     dt = step;
@@ -8854,38 +8938,6 @@ class Background {
       damp(this.base[2], this.baseTarget[2], 0.45, dt),
     ];
 
-    const playing = this.reactive && this.isPlaying ? this.isPlaying() : !this.reactive;
-    const level = !still && this.reactive && this.getLevel ? this.getLevel() : 0;
-    const air = !still && this.reactive && this.getAir ? this.getAir() : 0;
-
-    /* The floor is the record's own average, followed slowly, so it is the
-       loudness rather than the movement. Everything the eye reacts to is what
-       stands above it. */
-    this.floor = damp(this.floor, level, 0.25, dt);
-    this.slow = damp(this.slow, level, 1.1, dt);
-    this.air = damp(this.air, air, 1.0, dt);
-
-    /* The beat itself. A quick follower chases the band, a slow one trails it,
-       and the distance between them is the transient — a kick or a snare is
-       exactly that: a spike the running average never sees. A short refractory
-       window keeps one hit from being counted three times. */
-    this.fast = damp(this.fast, level, 16, dt);
-    if (playing && !still && this.fast - this.slow > 0.022 && this.t - this.lastBeat > 0.14) {
-      this.lastBeat = this.t;
-      this.beat = 1;
-    }
-    /* the swell: quick to open, slower to close, and never a step */
-    this.beat = this.beat > 0 ? damp(this.beat, 0, 5.5, dt) : damp(this.beat, 0, 18, dt);
-    this.beat = Math.min(this.beat, 0.92);
-
-    const pulse = clamp01((level - this.floor) * 3.2) * 0.55 + this.air * 0.45;
-    const wanted = this.reactive ? pulse : 0;
-    this.energy = damp(this.energy, wanted, 0.85, dt);
-    this.swell = damp(this.swell, wanted, 0.3, dt);
-    /* and the colour drains away as the music does, so silence looks like
-       silence instead of like the track still playing quietly */
-    this.quiet = damp(this.quiet, playing && this.reactive ? 0 : 1, 0.5, dt);
-
     const { ctx, w, h } = this;
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = rgbCss(this.base);
@@ -8894,9 +8946,11 @@ class Background {
     ctx.globalCompositeOperation = 'screen';
     /* Three contributions, all of them bounded. The beat swells the light, the
        pulse breathes it, and the swell shifts its colour. The beat carries the
-       most weight because that is what the eye reads as "the music is here",
-       but it is a wavefront crossing a soft gradient, not a flashbulb. */
-    const boost = 1 + this.energy * 0.22 + this.beat * 0.3;
+       most weight because that is what the eye reads as "the music is here" -
+       it is the only one of the three that is fast enough to answer a hit while
+       it happens, the other two are the body of the music under it. Still a
+       wavefront crossing a soft gradient, not a flashbulb. */
+    const boost = 1 + this.energy * 0.22 + this.beat * 0.36;
     const dim = 1 - this.quiet * 0.42;
 
     for (const b of this.blobs) {

@@ -300,7 +300,13 @@ class AudioEngine {
 
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 2048;
-    this.analyser.smoothingTimeConstant = 0.78;
+    /* 0.6, а не 0.78. Это скользящее среднее по кадрам, и на высоком значении
+       оно съедает ровно то, ради чего фон слушает музыку: удар длится десятки
+       миллисекунд, а сглаживание растягивает его на сотни и приподнимает всю
+       оставшуюся кривую — удар перестаёт быть ударом. На 0.6 полосы для
+       столбиков всё ещё выглядят гладко, а транзиенты доходят до детектора
+       живыми. */
+    this.analyser.smoothingTimeConstant = 0.6;
     this.freq = new Uint8Array(this.analyser.frequencyBinCount);
 
     this.master = ctx.createGain();
