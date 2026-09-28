@@ -120,13 +120,6 @@
       "trackIds": []
     }
   ],
-  "updatedAt": 1790502698597,
-  "genres": [
-    {
-      "key": "muzyka",
-      "label": "Музыка",
-      "color": "#7ff221"
-    }
-  ],
-  "exportedAt": "2026-09-27T09:51:39.798Z"
+  "updatedAt": 1790577686807,
+  "exportedAt": "2026-09-28T06:45:11.396Z"
 }
