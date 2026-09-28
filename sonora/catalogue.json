@@ -166,22 +166,6 @@
       "url": "https://radiorecord.hostingradio.ru/sd9096.aacp",
       "source": "stream",
       "custom": true
-    },
-    {
-      "id": "radio-9",
-      "title": "Europe plus",
-      "artist": "Europe plus",
-      "album": "Europe plus",
-      "year": 2026,
-      "duration": 0,
-      "colors": [
-        "#ff7a6b",
-        "#ffc46b"
-      ],
-      "blurb": "",
-      "url": "https://europaplus.ru/playlist?openModal=ether&region=ufa",
-      "source": "stream",
-      "custom": true
     }
   ],
   "playlists": [
@@ -206,6 +190,6 @@
       "trackIds": []
     }
   ],
-  "updatedAt": 1790581080164,
-  "exportedAt": "2026-09-28T07:38:01.368Z"
+  "updatedAt": 1790581339785,
+  "exportedAt": "2026-09-28T07:42:20.997Z"
 }
