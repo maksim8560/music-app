@@ -98,6 +98,23 @@
       "url": "https://radiorecord.hostingradio.ru/trap96.aacp",
       "source": "stream",
       "custom": true
+    },
+    {
+      "id": "url-2",
+      "title": "Всё так",
+      "artist": "2Gun",
+      "album": "Ссылки",
+      "year": 2026,
+      "duration": 0,
+      "colors": [
+        "#2f8cff",
+        "#63f5d2"
+      ],
+      "blurb": "",
+      "coverUrl": "https://avatars.yandex.net/get-music-content/16464214/b086be1f.a.42500171-1/300x300",
+      "url": "https://music.yandex.ru/album/42500171/track/152336756",
+      "source": "url",
+      "custom": true
     }
   ],
   "playlists": [
@@ -120,6 +137,6 @@
       "trackIds": []
     }
   ],
-  "updatedAt": 1790578042203,
-  "exportedAt": "2026-09-28T06:47:23.407Z"
+  "updatedAt": 1790578398267,
+  "exportedAt": "2026-09-28T06:53:19.471Z"
 }
