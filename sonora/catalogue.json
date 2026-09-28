@@ -132,6 +132,23 @@
       "url": "https://rusradio.hostingradio.ru/rusradio128.mp3",
       "source": "stream",
       "custom": true
+    },
+    {
+      "id": "radio-7",
+      "title": "Дорожное Радио",
+      "artist": "Дорожное Радио",
+      "album": "Дорожное Радио",
+      "year": 2026,
+      "duration": 0,
+      "colors": [
+        "#ff7a6b",
+        "#ffc46b"
+      ],
+      "blurb": "",
+      "coverUrl": "https://www.prfm.ru/logo/dorozhnoe-logo.png",
+      "url": "https://dorognoe.hostingradio.ru:8000/dorognoe",
+      "source": "stream",
+      "custom": true
     }
   ],
   "playlists": [
@@ -156,6 +173,6 @@
       "trackIds": []
     }
   ],
-  "updatedAt": 1790579543457,
-  "exportedAt": "2026-09-28T07:12:58.610Z"
+  "updatedAt": 1790580113093,
+  "exportedAt": "2026-09-28T07:21:54.296Z"
 }
