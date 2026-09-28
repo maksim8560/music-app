@@ -149,6 +149,23 @@
       "url": "https://dorognoe.hostingradio.ru:8000/dorognoe",
       "source": "stream",
       "custom": true
+    },
+    {
+      "id": "radio-8",
+      "title": "«Супердискотека 90-х»",
+      "artist": "«Супердискотека 90-х»",
+      "album": "«Супердискотека 90-х»",
+      "year": 2026,
+      "duration": 0,
+      "colors": [
+        "#ff7a6b",
+        "#ffc46b"
+      ],
+      "blurb": "",
+      "coverUrl": "https://sun9-51.userapi.com/impf/uBfr5hTaY01pjO966fVRrEHsFE8DOtoyU80k2w/UzaFuZsuNm8.jpg?size=500x500&quality=96&sign=baa208b2b9c09c352606ecb0ab8d7e46&type=album",
+      "url": "https://radiorecord.hostingradio.ru/sd9096.aacp",
+      "source": "stream",
+      "custom": true
     }
   ],
   "playlists": [
@@ -173,6 +190,6 @@
       "trackIds": []
     }
   ],
-  "updatedAt": 1790580441498,
-  "exportedAt": "2026-09-28T07:27:22.702Z"
+  "updatedAt": 1790580596692,
+  "exportedAt": "2026-09-28T07:29:57.893Z"
 }
