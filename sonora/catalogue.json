@@ -113,7 +113,8 @@
       "blurb": "",
       "url": "https://hls-01-gpm.hostingradio.ru/relaxfm495/playlist.m3u8",
       "source": "stream",
-      "custom": true
+      "custom": true,
+      "coverUrl": "https://avatars.mds.yandex.net/get-music-misc/69699/img.697748f6b8404729fd166980/m1000x1000"
     }
   ],
   "playlists": [
@@ -136,6 +137,6 @@
       "trackIds": []
     }
   ],
-  "updatedAt": 1790578976919,
-  "exportedAt": "2026-09-28T07:02:58.124Z"
+  "updatedAt": 1790579086724,
+  "exportedAt": "2026-09-28T07:04:47.929Z"
 }
