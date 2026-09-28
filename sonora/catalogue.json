@@ -98,23 +98,6 @@
       "url": "https://radiorecord.hostingradio.ru/trap96.aacp",
       "source": "stream",
       "custom": true
-    },
-    {
-      "id": "url-2",
-      "title": "42500171",
-      "artist": "По ссылке",
-      "album": "Ссылки",
-      "year": 2026,
-      "duration": 0,
-      "colors": [
-        "#2f8cff",
-        "#63f5d2"
-      ],
-      "blurb": "",
-      "coverUrl": "https://avatars.yandex.net/get-music-content/16464214/b086be1f.a.42500171-1/300x300",
-      "url": "https://music.yandex.ru/album/42500171?utm_source=web&utm_medium=copy_link",
-      "source": "url",
-      "custom": true
     }
   ],
   "playlists": [
@@ -137,6 +120,6 @@
       "trackIds": []
     }
   ],
-  "updatedAt": 1790578534916,
-  "exportedAt": "2026-09-28T06:55:36.120Z"
+  "updatedAt": 1790578549517,
+  "exportedAt": "2026-09-28T06:55:50.720Z"
 }
