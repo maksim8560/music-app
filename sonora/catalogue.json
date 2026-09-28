@@ -115,6 +115,23 @@
       "source": "stream",
       "custom": true,
       "coverUrl": "https://avatars.mds.yandex.net/get-music-misc/69699/img.697748f6b8404729fd166980/m1000x1000"
+    },
+    {
+      "id": "radio-6",
+      "title": "Русское Радио",
+      "artist": "Русское Радио",
+      "album": "Русское Радио",
+      "year": 2026,
+      "duration": 0,
+      "colors": [
+        "#ff7a6b",
+        "#ffc46b"
+      ],
+      "blurb": "",
+      "coverUrl": "https://sun9-44.vkuserphoto.ru/s/v1/ig2/biJGu_fxJCzDBip96PAatycZXr-eJieDJv2xPzLBG41rWEoLtnywz0eAAfjRNxSeo6wWcSPrDBTQQv4N8uQCH5kN.jpg?quality=95&as=32x32,48x48,72x72,108x108,160x160,240x240,360x360,480x480,540x540,640x640,720x720,1080x1080&from=bu&cs=640x0",
+      "url": "https://rusradio.hostingradio.ru/rusradio128.mp3",
+      "source": "stream",
+      "custom": true
     }
   ],
   "playlists": [
@@ -137,6 +154,6 @@
       "trackIds": []
     }
   ],
-  "updatedAt": 1790579086724,
-  "exportedAt": "2026-09-28T07:04:47.929Z"
+  "updatedAt": 1790579445129,
+  "exportedAt": "2026-09-28T07:10:46.331Z"
 }
