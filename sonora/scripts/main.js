@@ -223,6 +223,31 @@ function initNav() {
     player.setRail(next);
     app.dataset.rail = String(next);
   });
+
+  /* ------------------------------------------------------------------ */
+  /* Compact mode                                                       */
+  /* ------------------------------------------------------------------ */
+  const compactBtn = qs('#btn-compact');
+  const applyCompact = (on_) => {
+    /* The panel reuses the rail, and the rail's rules hang off `data-rail`.
+       Setting the attribute means the hide-list is written once in this project
+       instead of being copied into the compact block to keep in step with it. */
+    app.dataset.compact = String(on_);
+    app.dataset.rail = String(on_ || store.get('rail'));
+    compactBtn.setAttribute('aria-pressed', String(on_));
+    compactBtn.title = on_ ? 'Обычный режим' : 'Компактный режим';
+    compactBtn.setAttribute('aria-label', on_ ? 'Обычный режим' : 'Компактный режим');
+    /* the backdrop repaints the blur on every glass surface above it, so a
+       cheaper blur is part of what this mode is for, not a side effect */
+    document.documentElement.style.setProperty('--glass-blur', on_ ? '12px' : '');
+    background.setCheap(on_);
+  };
+  applyCompact(store.get('compact'));
+  on(compactBtn, 'click', () => {
+    const next = !store.get('compact');
+    store.set({ compact: next });
+    applyCompact(next);
+  });
 }
 
 /* ==========================================================================

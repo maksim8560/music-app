@@ -27,6 +27,10 @@ const DEFAULTS = {
   recently: [],
   /* interface */
   rail: false,
+  /* Компактный режим: панель уезжает в значки, обложка уменьшается, из панели
+     уходят подписи, которые приходилось читать вскользь. Включается кнопкой в
+     шапке и запоминается. */
+  compact: false,
   settings: {
     theme: 'dark',
     accent: 'aurora',
@@ -80,7 +84,7 @@ function load() {
 /** Keys that survive a reload. */
 const PERSIST = [
   'order', 'filter', 'view', 'currentId', 'position', 'volume', 'muted',
-  'shuffle', 'repeat', 'queue', 'likes', 'recently', 'rail', 'settings',
+  'shuffle', 'repeat', 'queue', 'likes', 'recently', 'rail', 'compact', 'settings',
 ];
 
 class Store {

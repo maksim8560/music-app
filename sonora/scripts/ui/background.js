@@ -23,6 +23,7 @@ const RES = 0.22; // internal resolution factor — upscaling to the viewport IS
    размытой картинке не отличаются от тридцати. */
 const FPS_IDLE = 5;
 const FPS_BUSY = 20;
+const FPS_CHEAP = 3;
 
 class Blob {
   constructor(rand, index) {
@@ -87,6 +88,9 @@ export class Background {
     this.quiet = 1;
     this.reactive = true;
     this.motion = true;
+    /* облегчённый режим: кнопка компактного вида. Размытие стекла в этот момент
+       тоже уменьшено, так что обе экономии складываются. */
+    this.cheap = false;
     this.t = 0;
     this.resize();
   }
@@ -151,7 +155,21 @@ export class Background {
    */
   #paintInterval() {
     const need = Math.min(1, this.beat * 1.4 + (this.pulse || 0));
-    return 1 / (FPS_IDLE + (FPS_BUSY - FPS_IDLE) * need);
+    const idle = this.cheap ? FPS_CHEAP : FPS_IDLE;
+    return 1 / (idle + (FPS_BUSY - idle) * need);
+  }
+
+  /**
+   * Облегчённый режим — по кнопке компактного вида.
+   *
+   * Там же уменьшается размытие стекла, а оно пересобирается на каждой
+   * перерисовке, поэтому экономия складывается: реже рисуем — реже
+   * пересобираем. Снизу в три раза, сверху — вдвое: 6 кадров в секунду на
+   * размытом градиенте, который никто не рассматривает, и десять рядом с
+   * битом, где движение всё-таки нужно.
+   */
+  setCheap(on_) {
+    this.cheap = !!on_;
   }
 
   /**

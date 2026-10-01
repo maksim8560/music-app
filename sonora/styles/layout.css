@@ -563,6 +563,100 @@
 .app[data-rail="true"] .sidebar__foot { justify-items: center; }
 
 /* ==========================================================================
+   Compact mode
+   --------------------------------------------------------------------------
+   The same shape a music player collapses to when you want the list and not the
+   artwork: panel to icons, cover down to the size of a thumbnail, and everything
+   that was only there to be read at leisure goes away.
+
+   It is written as token overrides rather than as a second copy of the layout,
+   so a size that lives in a token shrinks with everything that reads it instead
+   of needing its own rule here. The panel reuses the rail, and the rail's rules
+   hang off `data-rail`, so entering compact mode sets that attribute too rather
+   than repeating what it hides.
+
+   The blur and the grain get cheaper as well, and that is the point of the mode
+   as much as the looks: every repaint of the backdrop rebuilds the blur on all
+   five glass surfaces and the full-screen grain blend above it, so on a weak
+   machine this is the difference between smooth and a slideshow.
+   ========================================================================== */
+.app[data-compact="true"] {
+  --sidebar-w: 78px;
+  --bar-h: 66px;
+  --gap-1: 4px;
+  --gap-2: 7px;
+  --gap-3: 11px;
+  --gap-4: 16px;
+  --gap-5: 22px;
+  --glass-blur: 12px;
+  --t-display: clamp(1.4rem, 2.6vw, 1.9rem);
+  --t-title: clamp(1.15rem, 1.8vw, 1.4rem);
+}
+
+.app[data-compact="true"] .sidebar { padding-inline: var(--gap-2); align-items: center; }
+.app[data-compact="true"] .brand__text,
+.app[data-compact="true"] .visits,
+.app[data-compact="true"] .nav__item span,
+.app[data-compact="true"] .nav__count,
+.app[data-compact="true"] .sidebar__label,
+.app[data-compact="true"] .side-list__name,
+.app[data-compact="true"] .side-list__add span,
+.app[data-compact="true"] .side-list__item em,
+.app[data-compact="true"] .side-list__empty,
+.app[data-compact="true"] .side-list__new,
+.app[data-compact="true"] .sidebar__hint,
+.app[data-compact="true"] .spectrum-mini { display: none; }
+
+.app[data-compact="true"] .nav__item,
+.app[data-compact="true"] .side-list__item,
+.app[data-compact="true"] .side-list__add {
+  justify-content: center;
+  padding-inline: 0;
+  width: 46px;
+}
+
+.app[data-compact="true"] .sidebar__top {
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 2px 0 0;
+}
+.app[data-compact="true"] .brand { justify-content: center; }
+.app[data-compact="true"] .sidebar__collapse { display: none; }
+.app[data-compact="true"] .side-list { display: flex; flex-direction: column; align-items: center; }
+.app[data-compact="true"] .sidebar__foot { justify-items: center; }
+
+/* the hero becomes a row: a thumbnail, the names, the transport. The caption
+   and the quality badge are the two things nobody misses in this view - one is
+   prose, the other is only true for files and not for a stream. */
+.app[data-compact="true"] .hero {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--gap-4);
+}
+.app[data-compact="true"] .art--xl {
+  max-width: 132px;
+  border-radius: var(--r-md);
+  animation: none;
+}
+.app[data-compact="true"] .hero__note,
+.app[data-compact="true"] .seek__badge,
+.app[data-compact="true"] .hero__meta,
+.app[data-compact="true"] .viz { display: none; }
+.app[data-compact="true"] .seek { margin-top: var(--gap-2); }
+.app[data-compact="true"] .hero__eyebrow { margin-bottom: var(--gap-2); }
+
+/* The bar's own height comes from its padding and the little cover, not from
+   --bar-h: that token only reserves room underneath the scroll. Measured 86px
+   before and 76px after, and it stops there on purpose - the transport keeps its
+   44px hit area, which is the entire reason it is that size, and a bar squeezed
+   below its own controls would be compact in the worst sense. */
+.app[data-compact="true"] .playbar__inner { padding: 5px 10px; }
+.app[data-compact="true"] .art--sm { width: 38px; height: 38px; border-radius: 11px; }
+.app[data-compact="true"] .mini-viz { width: 130px; height: 22px; }
+.app[data-compact="true"] .playbar__right { gap: var(--gap-2); }
+
+/* ==========================================================================
    Responsive
    ========================================================================== */
 @media (max-width: 1180px) {
