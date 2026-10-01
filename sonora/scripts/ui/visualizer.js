@@ -206,8 +206,22 @@ export function createVisualizers({ getSpectrum, isPlaying }) {
   const mini = new Bars(document.getElementById('bar-viz'), { bars: 30, mirrored: false, caps: false, min: 0.05 });
   const side = new SideStrip(document.getElementById('side-spectrum'));
 
+  /* Столбики спектра не обязаны идти каждый кадр. Раньше они перерисовывались
+     на каждом кадре браузера — 56 полос с градиентами, ещё 30, плюс запись в 16
+     элементов боковой полоски, — то есть около сотни операций с оверхедом на
+     каждый кадр ради картинки, которую глаз не отличает от тридцати в секунду.
+     Полмига — это ровно то, как выглядит эквалайзер в большинстве плееров. */
+  const FRAME = 1 / 30;
+  let acc = 0;
+
   const stop = addTask((dt) => {
-    if (document.hidden) return;
+    if (document.hidden) {
+      acc = 0;
+      return;
+    }
+    acc += dt;
+    if (acc < FRAME) return;
+    acc = 0;
     const data = getSpectrum();
     const active = isPlaying();
     hero.draw(data, dt, active);

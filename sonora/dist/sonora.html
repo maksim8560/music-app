@@ -163,9 +163,12 @@
   --glass-line: rgba(255, 255, 255, 0.1);
   --glass-line-2: rgba(255, 255, 255, 0.16);
   --glass-spec: rgba(255, 255, 255, 0.22);
-  /* 26px instead of 42px: the backdrop is repainting ~24x/s and every glass
-     surface re-composites its blur on each repaint. Visually near-identical. */
-  --glass-blur: 26px;
+  /* 18px, а не 42 и не 26. Размытие обходится пропорционально площади и
+     радиусу, поверхностей пять, и над ними каждый раз пересобирается всё, что
+     под ними, — то есть пять размытий на каждую перерисовку фона. Разница
+     между 26 и 18 на глаз почти не видна: матовость чуть меньше. Вернуть —
+     одна правка, если вид важнее. */
+  --glass-blur: 18px;
 
   --fill-1: rgba(255, 255, 255, 0.045);
   --fill-2: rgba(255, 255, 255, 0.085);
@@ -199,7 +202,12 @@
   --glass-line: rgba(12, 14, 26, 0.08);
   --glass-line-2: rgba(12, 14, 26, 0.12);
   --glass-spec: rgba(255, 255, 255, 0.95);
-  --glass-blur: 26px;
+  /* 18px, а не 26px. Размытие обходится пропорционально площади и радиусу, а
+     поверхностей пять, и над ними каждый раз заново пересобирается всё, что
+     под ними. Разница на глаз почти не видна — матовость чуть меньше, — но на
+     слабой машине и на большом экране это ровно тот рычаг, который возвращает
+     кадры. Вернуть 26 — одна правка, если вид важнее. */
+  --glass-blur: 18px;
 
   --fill-1: rgba(12, 14, 26, 0.035);
   --fill-2: rgba(12, 14, 26, 0.06);
@@ -8797,11 +8805,18 @@ const { cssVar: cssVar, damp: damp } = __req("scripts/core/dom.js");
 const COUNT = 5;
 const RES = 0.22; // internal resolution factor — upscaling to the viewport IS the blur
 
-/* Repaint rate, floating between these. The reason it floats is in
-   #paintInterval: a repaint costs the glass above it a full re-blur, so it is
-   spent where it shows and withheld where it doesn't. */
-const FPS_IDLE = 12;
-const FPS_BUSY = 30;
+/* Частота перерисовки, плавает между этими. Смысл в #paintInterval: перерисовка
+   стоит очень дорого — заново пересобираются все пять стеклянных поверхностей
+   над холстом и полноэкранное смешение зерна, — поэтому она тратится там, где
+   её видно, и придерживается там, где её не видно.
+
+   Нижняя граница пять, а не двенадцать: в тихом месте фон медленно дрейфует
+   (оттенок на 1.2° в секунду), и между соседними кадрами разница не
+   показывается вообще. Двадцать наверху — этого достаточно для мягкого
+   градиента, который к тому же размыт до пятен: двадцать кадров в секунду на
+   размытой картинке не отличаются от тридцати. */
+const FPS_IDLE = 5;
+const FPS_BUSY = 20;
 
 class Blob {
   constructor(rand, index) {
@@ -11177,8 +11192,22 @@ function createVisualizers({ getSpectrum, isPlaying }) {
   const mini = new Bars(document.getElementById('bar-viz'), { bars: 30, mirrored: false, caps: false, min: 0.05 });
   const side = new SideStrip(document.getElementById('side-spectrum'));
 
+  /* Столбики спектра не обязаны идти каждый кадр. Раньше они перерисовывались
+     на каждом кадре браузера — 56 полос с градиентами, ещё 30, плюс запись в 16
+     элементов боковой полоски, — то есть около сотни операций с оверхедом на
+     каждый кадр ради картинки, которую глаз не отличает от тридцати в секунду.
+     Полмига — это ровно то, как выглядит эквалайзер в большинстве плееров. */
+  const FRAME = 1 / 30;
+  let acc = 0;
+
   const stop = addTask((dt) => {
-    if (document.hidden) return;
+    if (document.hidden) {
+      acc = 0;
+      return;
+    }
+    acc += dt;
+    if (acc < FRAME) return;
+    acc = 0;
     const data = getSpectrum();
     const active = isPlaying();
     hero.draw(data, dt, active);

@@ -11,11 +11,18 @@ import { cssVar, damp } from '../core/dom.js';
 const COUNT = 5;
 const RES = 0.22; // internal resolution factor — upscaling to the viewport IS the blur
 
-/* Repaint rate, floating between these. The reason it floats is in
-   #paintInterval: a repaint costs the glass above it a full re-blur, so it is
-   spent where it shows and withheld where it doesn't. */
-const FPS_IDLE = 12;
-const FPS_BUSY = 30;
+/* Частота перерисовки, плавает между этими. Смысл в #paintInterval: перерисовка
+   стоит очень дорого — заново пересобираются все пять стеклянных поверхностей
+   над холстом и полноэкранное смешение зерна, — поэтому она тратится там, где
+   её видно, и придерживается там, где её не видно.
+
+   Нижняя граница пять, а не двенадцать: в тихом месте фон медленно дрейфует
+   (оттенок на 1.2° в секунду), и между соседними кадрами разница не
+   показывается вообще. Двадцать наверху — этого достаточно для мягкого
+   градиента, который к тому же размыт до пятен: двадцать кадров в секунду на
+   размытой картинке не отличаются от тридцати. */
+const FPS_IDLE = 5;
+const FPS_BUSY = 20;
 
 class Blob {
   constructor(rand, index) {
